@@ -33,14 +33,14 @@ MonadicTwoOutput! ← (
 
 Dyadic! ← (
   ⊃↙↘ 2
-  ∩°□°⊟
+  °{⊙∘}
   ^2
   ⊂□
 )
 
 DyadicNoOutput! ← (
   ⊃↙↘ 2
-  ∩°□°⊟
+  °{⊙∘}
   ^2.0
 )
 
@@ -53,25 +53,34 @@ Triadic! ← (
 
 # instr stack -- stack
 ExecuteInstruction ← (
-  =3type.
+  type.
   (
-    ⊂□ # plain literal
+    ⊂□ # number literal
+  | ⍤$"complex in JSON? _"⊙0
+  | ⊂□ # string literal
   | type°□⊢.
     (
-      # array literal
-      ⊃(°□⊢|⊐≡∘ °⊟↘1)
+      # array literal: [ type shape elements ]
+      ⊙(⊐≡∘) °{⊙⊙∘}
       (
         # number array
-        ⊙(⊐≡∘)
+        ⊙≡°□
         | # complex array
-        ⊙(≡(ℂ:∩°□°⊟) ⊐≡∘)
+        ⊙≡(ℂ°{:}°□)
         | # char array
-        ⊙(⊐≡∘)
+        ⊙≡°□
         | # box array
-        ⊙°□
+        ⊙∘
       )
-      ⊂□ ↯
-    | ⍤"unexpected complex instr type"0 ⋅∘
+      # -- shape elements
+      ±⧻.
+      (
+        # scalar (used for char literals)
+        ⊂□ ⊢⊢ ;
+        | # regular array: apply shape
+        ⊂□ ↯
+      )
+    | ⍤$"complex in JSON? _"⊙0
     | ⊗: {"dup" "pop" "over" "flip" "identity"
           "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
           "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
@@ -88,11 +97,11 @@ ExecuteInstruction ← (
           "args"
           "im_show"} ⊢.
       (
-        ⋅(⊂⊢.)
-        | ⋅(↘1)
-        | ⋅(⊂⊡1.)
-        | ⋅⍜(↙2)⇌
-        | ⋅(↘0)
+        ⋅(⊂⊢.)    # dup
+        | ⋅(↘1)   # pop
+        | ⋅(⊂⊡1.) # over
+        | ⋅⍜(↙2)⇌ # flip
+        | ⋅(↘0)   # identity
         | ⋅Monadic!¬
         | ⋅Monadic!±
         | ⋅Monadic!¯
@@ -168,8 +177,8 @@ ExecuteInstruction ← (
         | ⋅Dyadic!has
         | ⋅Dyadic!get
         | ⋅Dyadic!remove
-        | ⋅(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌.)
-        | ⋅(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_"°□⊢.)
+        | ⋅(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌.) # stack
+        | ⋅(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_"°□⊢.)              # trace
         | ⋅MonadicNoOutput!&s
         | ⋅MonadicNoOutput!&pf
         | ⋅MonadicNoOutput!&p
@@ -196,10 +205,12 @@ ExpandTopSlices ← (
   ⊏
 )
 
+InitialStack ← ⊙{}
+
 # jsonasm -- finalstack
 Run ← (
   ExpandTopSlices
-  ∧(ExecuteInstruction °□) ⊙{}
+  ∧(ExecuteInstruction °□) InitialStack
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
@@ -281,6 +292,8 @@ Parallel! ← (
 RunTests ← (
   $ 123
   $ \"hello\"
+  $ @x
+  $ @😇
   $ []
   $ [i 0 1 2]
   $ {}
