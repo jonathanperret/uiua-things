@@ -51,13 +51,55 @@ Triadic! ← (
   ⊂□
 )
 
-# instr stack -- stack
-ExecuteInstruction ← (
+# map -- keys
+MapKeys ← ▽ ≡(¬≍NaN °□). °□⊢
+
+# map -- pairs
+MapPairs ← ⍉⊟ ∩▽ ,: ≡(¬≍NaN °□). °{⊙∘}
+
+InitialStack ← {}
+
+# slice stack -- frame
+MakeFrame ← (|2
+  ExpandSlice
+  0 # pc
+  {⊙⊙∘}
+)
+
+# { Switch { count, sig, span } } stack -- stack' newframe?
+Switch ← (
+  ⊙(°□⊢) °{⊙∘}↙2 ;°{⊙∘} # get count, inputcount
+  # -- count inputcount stack
+  ⊃(
+    ↘ +1 +     # remaining stack
+  | °□⊡ ⊙⋅∘    # selector: after slices
+  | ⇌↙ ⊙⋅∘     # slices, reversed
+  | ↘⊃∘(↙ +)+1 # inputs: after slices and selector
+  )
+  # -- stack' selector slices newstack
+  ⊙(
+    °□⊡ # pick selected slice # TODO: array selectors
+    # -- slice newstack stack
+    [MakeFrame]
+  )
+  # -- stack [newframe]
+)
+
+# { PushFunc { id, sig, slice } } stack -- stack' newframe?
+PushFunc ← (
+  ;;°{⊙⊙∘} ;°{⊙∘} # get slice
+  ⊐≡∘             # clean it up
+  ⊂□              # push slice
+  ⊙[]             # no new frame
+)
+
+# instr stack -- stack' newframe?
+ExecuteInstruction ← (|2.2
   type.
   (
-    ⊂□ # number literal
-  | ⍤$"complex in JSON? _"⊙0
-  | ⊂□ # string literal
+    ⊙[] ⊂□ # number literal
+  | ⊙[] ⍤$"complex in JSON? _"⊙0
+  | ⊙[] ⊂□ # string literal
   | type°□⊢.
     (
       # array literal: [ type shape elements ]
@@ -80,7 +122,8 @@ ExecuteInstruction ← (
         | # regular array: apply shape
         ⊂□ ↯
       )
-    | ⍤$"complex in JSON? _"⊙0
+      ⊙[]
+    | ⊙[] ⍤$"complex in JSON? _"⊙0
     | ⊗: {"dup" "pop" "over" "flip" "identity"
           "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
           "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
@@ -192,25 +235,76 @@ ExecuteInstruction ← (
         | ⋅MonadicNoOutput!&ims
         | ⍤$"unknown instr: _"⊙0
       )
+      ⊙[] # no new frame
+    |     # { "Instr": [ args… ] }
+      ⊢ MapPairs
+      ⊗: {"PushFunc" "Switch"} ⊢.
+      (
+        PushFunc
+        | Switch
+        | ⊙[] ⍤$"unknown instr: _"⊙0
+      )
     )
   )
 )
 
-ExpandTopSlices ← (
-  ⊃(
-    ⊐≡≡∘°□get "top_slices"
-    ⊐/⊂ ≡(□ExpandSlice)
-  | °□get "instrs"
+# frame = { pc addrs stack }
+
+# frame -- bool
+FrameDone ← ≤ ⊙⧻ °{⊙∘}↙2
+
+# callstack instrs -- callstack'
+Advance ← (|2
+  FrameDone ⊢ . # reached end of top frame?
+  (
+    # no, proceed
+    ⍜⊢(
+      ⍜(°{⊙⊙∘}) (
+        # -- pc addrs stack instrs
+        ⊃(
+          +1     # advance pc
+            | ⋅∘ # keep addrs
+            |    # -- pc addrs stack instrs
+
+          ⊃(°□⊡⊡ ⊙⊙⋅∘|⋅⋅∘) # fetch next instr, keep stack
+
+          # -- instr stack
+          ExecuteInstruction
+          # -- stack' newframe?
+        )
+        # -- pc addrs stack newframe?
+      )
+    )
+    # -- callstack newframe?
+    ⊂: # push new frame (if it exists) on top of callstack
+  |    # yes: pop it and merge its stack with previous frame
+    ⊃(↘1|°□⊡2⊢)
+    ⍜(°□⊡ 0_2)⊂
   )
-  ⊏
 )
 
-InitialStack ← ⊙{}
-
 # jsonasm -- finalstack
-Run ← (
-  ExpandTopSlices
-  ∧(ExecuteInstruction °□) InitialStack
+Run ← (|1
+  ⊃(
+    ⊐≡≡∘°□get "top_slices"
+  | °□get "instrs"
+  )
+  # -- slices instrs
+  ⊙InitialStack
+  # -- slices stack instrs
+  ∧(|3.2
+    # -- slice stack instrs
+    ⊃(MakeFrame|⋅⋅∘) # build frame from slice and previous stack, keep instrs
+    # -- frame instrs
+    ¤ # setup callstack
+    # -- callstack instrs
+    ⍢(⊃(Advance|⋅∘)|(¬FrameDone °[∘]|1)>1⧻.)
+
+    ⋅⋅∘ °{⊙⊙∘} ⊢⇌ # extract stack from top frame
+    # -- stack' instrs
+  )
+  # -- stack' instrs
+  ⊙; # drop instrs
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
@@ -289,105 +383,124 @@ Parallel! ← (
   ⊐/⊂ ≡(□≡wait ≡spawn^1 ▽≡(¬≍□0).) ⬚(□0)↯ ⊟ NumProcs ¯1
 )
 
-RunTests ← (
-  $ 123
-  $ \"hello\"
-  $ @x
-  $ @😇
-  $ []
-  $ [i 0 1 2]
-  $ {}
-  $ [[4 5 6][7 8 9]]
-  $ [\"x\" \"y\"]
-  $ {\"x\" \"yz\"}
-  $ .2
-  $ ,1 2
-  $ :1 2
-  $ ;1 2 3
-  $ ∘3
-  $ ¬ 3
-  $ ± 3
-  $ ¯ 1
-  $ ⌵ `1
-  $ √ 4
-  $ ○ 0
-  $ ⌊ 1234.56
-  $ ⌈ 1.234
-  $ ⁅ 5.678
-  $ =1 2
-  $ ≠1 2
-  $ <1 2
-  $ ≤1 2
-  $ >1 2
-  $ ≥1 2
-  $ +2 4
-  $ -2 5
-  $ *2 4
-  $ ÷2 6
-  $ ◿2 7
-  $ ⁿ2 3
-  $ ₙ2 8
-  $ ↧3 8
-  $ ↥3 8
-  $ ∠1 0
-  $ ℂ1 2
-  $ - . rand
-  $ ⧻5
-  $ △5
-  $ ⇡5
-  $ ⊢1\_2\_3
-  $ ⇌1\_2\_3\_9
-  $ ♭5
-  $ ¤5
-  $ ⋯27
-  $ ⍉.[1\_2 3\_4 5\_6]
-  $ ⍏6\_2\_7\_0\_¯1\_5
-  $ ⍖6\_2\_7\_0\_¯1\_5
-  $ ⊚ [1 0 0 1 0 1 1 0]
-  $ ⊛7\_7\_8\_0\_1\_2\_0
-  $ ⊝7\_7\_8\_0\_1\_2\_0
-  $ ⊔□5
-  $ ⋕ "17"
-  $ ≍ 1\_2\_3 [1 2 3]
-  $ ⊟ 1 2
-  $ ⊂ 1 2
-  $ ⊏ 2 [8 3 9 2 0]
-  $ ⊡ 2 [8 3 9 2 0]
-  $ ↯ 2\_3 [1 2 3 4 5 6]
-  $ ☇ 0 ↯2\_3\_3⇡18
-  $ ↙ 3 [8 3 9 2 0]
-  $ ↘ 3 [8 3 9 2 0]
-  $ ↻1 ⇡5
-  $ ◫2 .⇡4
-  $ ▽ [1 0 2 3 1] [8 3 9 2 0]
-  $ ⌕ 5 [1 8 5 2 3 5 4 5 6 7]
-  $ ∊ 2 [1 2 3]
-  $ ⊗ 2 [1 2 3]
-  $ ⍤"ok" 1
-  $ ±gen0
-  $ deal0 [1 2 3 4 5]
-  $ regex "h([io])" "hihaho"
-  $ utf "hello!"
-  $ ≥0tag
-  $ type 5
-  $ ±now
-  $ η
-  $ π
-  $ τ
-  $ ∞
-  $ map 1\_2 3\_4
-  $ insert 1 2 {}
-  $ map 1\_2 3\_4
-  $ map 1\_2 3\_4
-  $ map 1\_2 3\_4
-  $ &sc
-  $ &cd "/tmp"
-  $ &fras "/tmp/data1.tmp" &fwa "/tmp/data1.tmp" "data"
-  $ &frab "/tmp/data2.tmp" &fwa "/tmp/data2.tmp" "data"
-  $ &ims [[1 0][0 1]]
-  $ type &args
+RunTests ← &p⍜now(
+  {
+    $ 123
+    $ "hello"
+    $ @x
+    $ @😇
+    $ []
+    $ [i 0 1 2]
+    $ {}
+    $ [[4 5 6][7 8 9]]
+    $ ["x" "y"]
+    $ {"x" "yz"}
 
-  ⊜□ ≠@\n.
+    $ .2
+    $ ,1 2
+    $ :1 2
+    $ ;1 2 3
+
+    $ ∘3
+    $ ¬ 3
+    $ ± 3
+    $ ¯ 1
+    $ ⌵ `1
+    $ √ 4
+    $ ○ 0
+    $ ⌊ 1234.56
+    $ ⌈ 1.234
+    $ ⁅ 5.678
+
+    $ =1 2
+    $ ≠1 2
+    $ <1 2
+    $ ≤1 2
+    $ >1 2
+    $ ≥1 2
+    $ +2 4
+    $ -2 5
+    $ *2 4
+    $ ÷2 6
+    $ ◿2 7
+    $ ⁿ2 3
+    $ ₙ2 8
+    $ ↧3 8
+    $ ↥3 8
+    $ ∠1 0
+    $ ℂ1 2
+
+    $ ⧻5
+    $ △5
+    $ ⇡5
+    $ ⊢[1 2 3]
+    $ ⇌[1 2 3]
+    $ ♭5
+    $ ¤5
+    $ ⋯27
+    $ ⍉.[[1 2] [3 4] [5 6]]
+    $ ⍏[6 2 7 0 ¯1 5]
+    $ ⍖[6 2 7 0 ¯1 5]
+    $ ⊚ [1 0 0 1 0 1 1 0]
+    $ ⊛[7 7 8 0 1 2 0]
+    $ ⊝[7 7 8 0 1 2 0]
+    $ ⊔□5
+    $ ⋕ "17"
+
+    $ ≍ [0 1 2] [0 1 2]
+    $ ⊟ 1 2
+    $ ⊂ 1 2
+    $ ⊏ 2 [8 3 9 2 0]
+    $ ⊡ 2 [8 3 9 2 0]
+    $ ↯ [2 3] [1 2 3 4 5 6]
+    $ ☇ 0 ↯[2 3 3]⇡18
+    $ ↙ 3 [8 3 9 2 0]
+    $ ↘ 3 [8 3 9 2 0]
+    $ ↻1 ⇡5
+    $ ◫2 .⇡4
+    $ ▽ [1 0 2 3 1] [8 3 9 2 0]
+    $ ⌕ 5 [1 8 5 2 3 5 4 5 6 7]
+    $ ∊ 2 [1 2 3]
+    $ ⊗ 2 [1 2 3]
+
+    $ ⍤"ok" 1
+    $ gen0
+    $ deal0 [1 2 3 4 5]
+    $ regex "h([io])" "hihaho"
+    $ utf "hello!"
+    $ ≥0 tag
+    $ type 5
+    $ ±now
+
+    $ η
+    $ π
+    $ τ
+    $ ∞
+
+    $ map 1\_2 3\_4
+    $ insert 1 2 {}
+    $ has 1 map 1\_2 3\_4
+    $ get 1 1\_2 3\_4
+    $ remove 3 map 1\_2 3\_4
+
+    $ - . ⚂
+
+    $ &sc
+    $ &cd "/tmp"
+    $ &fras "/tmp/data1.tmp" &fwa "/tmp/data1.tmp" "data"
+    $ &frab "/tmp/data2.tmp" &fwa "/tmp/data2.tmp" "data"
+    $ &ims [[1 0][0 1]]
+    $ type &args
+
+    $ (10|20)0
+    $ (10 20|20 30)1
+    $ (*2|*4+)1 10 20
+
+    $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
+
+    ""  }
+
+  ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
   /↧ Parallel!(AutoCheck °□)
   # /↧ ≡(AutoCheck °□)
   &p⊡:"😭🎉"
