@@ -57,7 +57,7 @@ MapKeys ← ▽ ≡(¬≍NaN °□). °□⊢
 # map -- pairs
 MapPairs ← ⍉⊟ ∩▽ ,: ≡(¬≍NaN °□). °{⊙∘}
 
-InitialStack ← {}
+EmptyStack ← {}
 
 # slice stack -- frame
 MakeFrame ← (|2
@@ -68,29 +68,43 @@ MakeFrame ← (|2
 
 # { Switch { count, sig, span } } stack -- stack' newframe?
 Switch ← (
-  ⊙(°□⊢) °{⊙∘}↙2 ;°{⊙∘} # get count, inputcount
-  # -- count inputcount stack
+  ⊙(⊐≡∘) °{⊙∘}↙2 ;°{⊙∘} # get fncount, sig
+  # -- fncount sig stack
   ⊃(
-    ↘ +1 +     # remaining stack
-  | °□⊡ ⊙⋅∘    # selector: after slices
-  | ⇌↙ ⊙⋅∘     # slices, reversed
-  | ↘⊃∘(↙ +)+1 # inputs: after slices and selector
+    ↘ +⊙⊢ +1     # remaining stack
+  | °□⊡ ⊙⋅∘      # selector: after fns
+  | ⇌↙ ⊙⋅∘       # fns, reversed
+  | ⋅∘           # keep sig
+  | ↘⊃∘(↙ +⊙⊢)+1 # inputs: after fns and selector
   )
-  # -- stack' selector slices newstack
+  # -- stack' selector fns sig newstack
   ⊙(
-    °□⊡ # pick selected slice # TODO: array selectors
-    # -- slice newstack stack
+    °□⊡ # pick selected fn # TODO: array selectors
+    # -- fn sig newstack
+    °⊟ # extract fnsig and fnslice
+    # -- fnsig slice sig newstack
+    # compute args to discard
+    ⊃(
+      ⋅∘         # keep slice
+    | /-⇌ - ⊙⋅⊙∘ # (sig.args - f.sig.args) - (sig.outputs - f.sig.outputs)
+      # -- discardcount newstack
+      ↘ ¯ # discard extra args
+    )
+    # -- slice newstack
     [MakeFrame]
   )
   # -- stack [newframe]
 )
 
+# fn on stack = [ sig slice ]
+
 # { PushFunc { id, sig, slice } } stack -- stack' newframe?
 PushFunc ← (
-  ;;°{⊙⊙∘} ;°{⊙∘} # get slice
-  ⊐≡∘             # clean it up
-  ⊂□              # push slice
-  ⊙[]             # no new frame
+  ;°{⊙⊙∘} ;°{⊙∘} # get slice and sig
+  ∩⊐≡∘           # clean them up
+  ⊟              # couple them
+  ⊂□             # push fn
+  ⊙[]            # no new frame
 )
 
 # instr stack -- stack' newframe?
@@ -274,37 +288,33 @@ Advance ← (|2
         )
         # -- pc addrs stack newframe?
       )
+      # -- frame newframe?
+      ⊂: # push new frame (if it exists) on top of callstack
     )
-    # -- callstack newframe?
-    ⊂: # push new frame (if it exists) on top of callstack
-  |    # yes: pop it and merge its stack with previous frame
-    ⊃(↘1|°□⊡2⊢)
-    ⍜(°□⊡ 0_2)⊂
+  | # yes: pop it and merge its stack with previous frame
+    ⊃(↘1|°□⊡0_2)
+    ⍜(°□⊡0_2)⊂
   )
+)
+
+CallStackActive ← (
+  (¬FrameDone °[∘]|1)>1⧻.
 )
 
 # jsonasm -- finalstack
 Run ← (|1
   ⊃(
     ⊐≡≡∘°□get "top_slices"
+    ≡(MakeFrame : EmptyStack) # initial callstack from top_slices
   | °□get "instrs"
   )
-  # -- slices instrs
-  ⊙InitialStack
-  # -- slices stack instrs
-  ∧(|3.2
-    # -- slice stack instrs
-    ⊃(MakeFrame|⋅⋅∘) # build frame from slice and previous stack, keep instrs
-    # -- frame instrs
-    ¤ # setup callstack
-    # -- callstack instrs
-    ⍢(⊃(Advance|⋅∘)|(¬FrameDone °[∘]|1)>1⧻.)
-
-    ⋅⋅∘ °{⊙⊙∘} ⊢⇌ # extract stack from top frame
-    # -- stack' instrs
+  # -- callstack instrs
+  ⍢(
+    ⊃Advance(⋅∘)
+  | CallStackActive
   )
-  # -- stack' instrs
-  ⊙; # drop instrs
+  ⊙;            # drop instrs
+  ⋅⋅∘ °{⊙⊙∘} ⊢⇌ # final stack from top frame
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
@@ -495,15 +505,16 @@ RunTests ← &p⍜now(
     $ (10|20)0
     $ (10 20|20 30)1
     $ (*2|*4+)1 10 20
-
+    $ (*2|*4+)0 10 20
+    $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
 
     ""  }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
-  /↧ Parallel!(AutoCheck °□)
-  # /↧ ≡(AutoCheck °□)
-  &p⊡:"😭🎉"
+  Parallel!(AutoCheck °□)
+  # ≡(AutoCheck °□)
+  &p⊡:"😭🎉" /↧
 )
 
 ¬IsImported
