@@ -13,9 +13,8 @@ Noadic! ← (
 
 Monadic! ← (
   ⊃⊢(↘1)
-  °□
-  ^1
-  ⊂□
+  ⍜°□ ^1
+  ⊂
 )
 
 MonadicNoOutput! ← (
@@ -42,6 +41,19 @@ DyadicNoOutput! ← (
   ⊃↙↘ 2
   °{⊙∘}
   ^2.0
+)
+
+DyadicTwoOutput! ← (
+  ⊃↙↘ 2
+  ⍜°{⊙∘} ^2.2
+  ⊂
+)
+
+DyadicThreeOutput! ← (
+  ⊃↙↘ 2
+  °{⊙∘}
+  ^2.3
+  ⊂{⊙⊙∘}
 )
 
 Triadic! ← (
@@ -141,27 +153,49 @@ ExecuteInstruction ← (|2.2
       )
       ⊙[]
     | ⊙[] ⍤$"complex in JSON? _"⊙0
-    | ⊗: {"dup" "pop" "over" "flip" "identity"
+    | ⊗: {"stack"
+
+          "tag" "now" "eta" "pi" "tau" "infinity" "scan_line" "rand" "args"
+
+          "pop" "show" "prin" "print" "change_directory" "im_show"
+
+          "identity" "trace"
           "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
-          "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
           "len" "shape" "range" "first" "reverse" "deshape" "fix" "bits" "transpose" "rise" "fall" "where" "classify" "deduplicate" "box" "unbox" "parse"
+          "utf" "type" "f_read_all_bytes" "f_read_all_str"
+
+          "dup" "gen"
+
+          "assert" "f_write_all"
+
+          "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
           "match" "couple" "join" "select" "pick" "reshape" "rerank" "take" "drop" "rotate" "windows" "keep" "find" "member" "index_of"
-          "assert"
-          "gen"
-          "deal" "regex" "utf" "tag" "type" "now"
-          "eta" "pi" "tau" "infinity"
-          "map" "insert" "has" "get" "remove" "stack" "trace"
-          "show" "prin" "print" "scan_line"
-          "rand"
-          "change_directory" "f_read_all_bytes" "f_read_all_str" "f_write_all"
-          "args"
-          "im_show"} ⊢.
+          "deal" "map" "has" "get" "remove" "regex"
+
+          "flip"
+
+          "over"
+
+          "insert"} ⊢.
       (
-        ⋅(⊂⊢.)    # dup
-        | ⋅(↘1)   # pop
-        | ⋅(⊂⊡1.) # over
-        | ⋅⍜(↙2)⇌ # flip
-        | ⋅(↘0)   # identity
+        ⋅(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌.) # stack
+        | ⋅Noadic!tag
+        | ⋅Noadic!now
+        | ⋅Noadic!η
+        | ⋅Noadic!π
+        | ⋅Noadic!τ
+        | ⋅Noadic!∞
+        | ⋅Noadic!&sc
+        | ⋅Noadic!⚂
+        | ⋅Noadic!(↘1 &args)
+        | ⋅MonadicNoOutput!;
+        | ⋅MonadicNoOutput!&s
+        | ⋅MonadicNoOutput!&pf
+        | ⋅MonadicNoOutput!&p
+        | ⋅MonadicNoOutput!&cd
+        | ⋅MonadicNoOutput!&ims
+        | ⋅Monadic!∘
+        | ⋅Monadic!(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_") # trace
         | ⋅Monadic!¬
         | ⋅Monadic!±
         | ⋅Monadic!¯
@@ -171,23 +205,6 @@ ExecuteInstruction ← (|2.2
         | ⋅Monadic!⌊
         | ⋅Monadic!⌈
         | ⋅Monadic!⁅
-        | ⋅Dyadic!=
-        | ⋅Dyadic!≠
-        | ⋅Dyadic!<
-        | ⋅Dyadic!≤
-        | ⋅Dyadic!>
-        | ⋅Dyadic!≥
-        | ⋅Dyadic!+
-        | ⋅Dyadic!-
-        | ⋅Dyadic!×
-        | ⋅Dyadic!÷
-        | ⋅Dyadic!◿
-        | ⋅Dyadic!ⁿ
-        | ⋅Dyadic!ₙ
-        | ⋅Dyadic!↧
-        | ⋅Dyadic!↥
-        | ⋅Dyadic!∠
-        | ⋅Dyadic!ℂ
         | ⋅Monadic!⧻
         | ⋅Monadic!△
         | ⋅Monadic!⇡
@@ -205,6 +222,31 @@ ExecuteInstruction ← (|2.2
         | ⋅Monadic!□
         | ⋅Monadic!°□
         | ⋅Monadic!⋕
+        | ⋅Monadic!utf
+        | ⋅Monadic!type
+        | ⋅Monadic!&frab
+        | ⋅Monadic!&fras
+        | ⋅MonadicTwoOutput!.
+        | ⋅MonadicTwoOutput!gen
+        | ⋅DyadicNoOutput!⍤
+        | ⋅DyadicNoOutput!&fwa
+        | ⋅Dyadic!=
+        | ⋅Dyadic!≠
+        | ⋅Dyadic!<
+        | ⋅Dyadic!≤
+        | ⋅Dyadic!>
+        | ⋅Dyadic!≥
+        | ⋅Dyadic!+
+        | ⋅Dyadic!-
+        | ⋅Dyadic!×
+        | ⋅Dyadic!÷
+        | ⋅Dyadic!◿
+        | ⋅Dyadic!ⁿ
+        | ⋅Dyadic!ₙ
+        | ⋅Dyadic!↧
+        | ⋅Dyadic!↥
+        | ⋅Dyadic!∠
+        | ⋅Dyadic!ℂ
         | ⋅Dyadic!≍
         | ⋅Dyadic!⊟
         | ⋅Dyadic!⊂
@@ -220,36 +262,15 @@ ExecuteInstruction ← (|2.2
         | ⋅Dyadic!⌕
         | ⋅Dyadic!∊
         | ⋅Dyadic!⊗
-        | ⋅DyadicNoOutput!⍤
-        | ⋅MonadicTwoOutput!gen
         | ⋅Dyadic!deal
-        | ⋅Dyadic!regex
-        | ⋅Monadic!utf
-        | ⋅Noadic!tag
-        | ⋅Monadic!type
-        | ⋅Noadic!now
-        | ⋅Noadic!η
-        | ⋅Noadic!π
-        | ⋅Noadic!τ
-        | ⋅Noadic!∞
         | ⋅Dyadic!map
-        | ⋅Triadic!insert
         | ⋅Dyadic!has
         | ⋅Dyadic!get
         | ⋅Dyadic!remove
-        | ⋅(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌.) # stack
-        | ⋅(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_"°□⊢.)              # trace
-        | ⋅MonadicNoOutput!&s
-        | ⋅MonadicNoOutput!&pf
-        | ⋅MonadicNoOutput!&p
-        | ⋅Noadic!&sc
-        | ⋅Noadic!⚂
-        | ⋅MonadicNoOutput!&cd
-        | ⋅Monadic!&frab
-        | ⋅Monadic!&fras
-        | ⋅DyadicNoOutput!&fwa
-        | ⋅Noadic!(↘1 &args)
-        | ⋅MonadicNoOutput!&ims
+        | ⋅Dyadic!regex
+        | ⋅DyadicTwoOutput!:
+        | ⋅DyadicThreeOutput!,
+        | ⋅Triadic!insert
         | ⍤$"unknown instr: _"⊙0
       )
       ⊙[] # no new frame
