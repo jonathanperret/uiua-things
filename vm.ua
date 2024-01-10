@@ -29,7 +29,11 @@ MakeFrame ← (|1
   {⊙∘}
 )
 
-# fn on stack = [ sig slice ]
+# TODO inverse modifiers:
+# (0[1], inv_dump),
+# (1[1], inv_scan),
+# (3[1], ungroup),
+# (3[1], unpartition),
 
 Trace ← ⊃∘(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_")
 
@@ -37,8 +41,8 @@ Stack ← ⊃∘(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°�
 
 Args ← ↘1 &args
 
-NoadicNoOutputNames ← {"stack"}
-NoadicNoOutputFns ← (Stack|⍤"bad prim id"0)
+NoadicNoOutputNames ← {"stack" "inv_stack"}
+NoadicNoOutputFns ← (Stack|Stack)
 
 NoadicOneOutputNames ← {"tag" "now" "eta" "pi" "tau" "infinity" "scan_line" "rand" "args"}
 NoadicOneOutputFns ← (tag|now|η|π|τ|∞|&sc|⚂|Args)
@@ -46,12 +50,22 @@ NoadicOneOutputFns ← (tag|now|η|π|τ|∞|&sc|⚂|Args)
 MonadicNoOutputNames ← {"pop" "show" "prin" "print" "change_directory" "im_show"}
 MonadicNoOutputFns ← (;|&s|&pf|&p|&cd|&ims)
 
+Last ← (|1
+  ⊢⇌
+)
+
 MonadicOneOutputNames ← {
   "identity" "trace"
   "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
   "len" "shape" "range" "first" "reverse" "deshape" "fix" "bits" "transpose" "rise" "fall"
   "where" "classify" "deduplicate" "box" "unbox" "parse"
-  "utf" "type" "f_read_all_bytes" "f_read_all_str"}
+  "utf" "type" "f_read_all_bytes" "f_read_all_str"
+  "acos" "asin" "cos"
+  "first_max_index" "first_min_index" "first_where"
+  "inv_fix" "inv_parse" "inv_trace" "inv_utf" "inv_where"
+  "inverse_bits"
+  "last" "last_max_index" "last_min_index"
+  "sort_down" "sort_up"}
 MonadicOneOutputFns ← (
   ∘
 | Trace
@@ -85,18 +99,45 @@ MonadicOneOutputFns ← (
 | type
 | &frab
 | &fras
+| ⍤"acos"0∘
+| ⍤"asin"0∘
+| ⍤"cos"0∘
+| ⍤"first_max_index"0∘
+| ⍤"first_min_index"0∘
+| ⍤"first_where"0∘
+| ⍤"inv_fix"0∘
+| ⍤"inv_parse"0∘
+| ⍤"inv_trace"0∘
+| ⍤"inv_utf"0∘
+| ⍤"inv_where"0∘
+| ⍤"inverse_bits"0∘
+| Last
+| ⍤"last_max_index"0∘
+| ⍤"last_min_index"0∘
+| ⍤"sort_down"0∘
+| ⍤"sort_up"0∘
 )
 
-MonadicTwoOutputNames ← {"dup" "gen"}
-MonadicTwoOutputFns ← (.|gen)
+MonadicTwoOutputNames ← {
+  "dup" "gen"
+  "inv_atan"
+  "inv_complex"
+  "inv_couple"
+  "inv_map"}
+MonadicTwoOutputFns ← (.|gen|⍤"inv_atan"0.|⍤"inv_complex"0.|⍤"inv_couple"0.|⍤"inv_map"0.)
 
 DyadicNoOutputNames ← {"assert" "f_write_all"}
 DyadicNoOutputFns ← (⍤|&fwa)
 
+Unfirst ← (|2
+  ⍜⊢(⋅∘)
+)
+
 DyadicOneOutputNames ← {
   "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
   "match" "couple" "join" "select" "pick" "reshape" "rerank" "take" "drop" "rotate" "windows" "keep" "find" "member" "index_of"
-  "deal" "map" "has" "get" "remove" "regex"}
+  "deal" "map" "has" "get" "remove" "regex"
+  "unfirst" "unlast" "unreshape"}
 DyadicOneOutputFns ← (
   =
 | ≠
@@ -136,6 +177,9 @@ DyadicOneOutputFns ← (
 | get
 | remove
 | regex
+| Unfirst
+| ⍤"unlast"0⋅∘
+| ⍤"unreshape"0⋅∘
 )
 
 DyadicTwoOutputNames ← {"flip"}
@@ -144,8 +188,23 @@ DyadicTwoOutputFns ← (:|⍤"bad prim id"0)
 DyadicThreeOutputNames ← {"over"}
 DyadicThreeOutputFns ← (,|⍤"bad prim id"0 ,)
 
-TriadicNoOutputNames ← {"insert"}
-TriadicOneOutputFns ← (insert|⍤"bad prim id"0 ⋅⋅∘)
+TriadicNoOutputNames ← {
+  "insert"
+  "undrop"
+  "unkeep"
+  "unpick"
+  "unrerank"
+  "unselect"
+  "untake"}
+TriadicOneOutputFns ← (
+  insert
+| ⍤"undrop"0⋅⋅∘
+| ⍤"unkeep"0⋅⋅∘
+| ⍤"unpick"0⋅⋅∘
+| ⍤"unrerank"0⋅⋅∘
+| ⍤"unselect"0⋅⋅∘
+| ⍤"untake"0⋅⋅∘
+)
 
 PrimNameLists ← {
   NoadicNoOutputNames
@@ -170,8 +229,8 @@ ExecPrimitive ← (
     NoadicNoOutputFns
   | ⊂□ NoadicOneOutputFns
   | MonadicNoOutputFns ⊙⊃(°□⊢|↘1)
-  | ⊂□ MonadicOneOutputFns ⊙⊃(°□⊢)(↘1)
-  | ⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢)(↘1)
+  | ⊂□ MonadicOneOutputFns ⊙⊃(°□⊢|↘1)
+  | ⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢|↘1)
   | DyadicNoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
   | ⊂□ DyadicOneOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
   | ⊂{⊙∘} DyadicTwoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
@@ -199,6 +258,8 @@ EndArray ← NotImplemented "EndArray"
 
 # {index} runtime -- runtime'
 Call ← NotImplemented "Call"
+
+# fn on stack = [ sig slice ]
 
 # [ sig slice ] runtime -- runtime'
 PushFunc ← (
@@ -332,14 +393,50 @@ PopTemp ← (|2
   ⍜RtStack (⊂⇌:)
 )
 
-# {stack count span} runtime -- runtime'
-CopyToTemp ← NotImplemented "CopyToTemp"
+# [stackid count] runtime -- runtime'
+CopyToTemp ← (|2
+  °⊟
+  # -- stackid count runtime
+  ⊃(⋅⋅∘|⋅∘|∘)
+  # -- runtime count stackid
+  # copy from stack
+  ⊃∘(↙: RtStack)
+  # -- runtime values stackid
+  ⊃(∘|⋅⋅∘|⋅∘)
+  # -- runtime stackid values
+  ⍜(RtTempStacks) (
+    # -- tempstacks stackid values
+    :
+    ⍜(°□⊡) (
+      ⊂⇌:
+    )
+  )
+)
 
-# {stack offset count span} runtime -- runtime'
-CopyFromTemp ← NotImplemented "CopyFromTemp"
+# [stackid offset count] runtime -- runtime'
+CopyFromTemp ← (|2
+  °[⊙⊙∘]
+  # -- stackid offset count runtime
+  ⊃(⋅⋅⋅∘|∘|⋅∘|⋅⋅∘)
+  # -- runtime stackid offset count
+  ⊃∘(↙: ↘: °□⊡: RtTempStacks)
+  # -- runtime values
+  # push to stack
+  ⍜RtStack (⊂⇌:)
+)
 
-# {stack count span} runtime -- runtime'
-DropTemp ← NotImplemented "DropTemp"
+# [stackid count] runtime -- runtime'
+DropTemp ← (|2
+  °⊟
+  # -- stackid count runtime
+  ⊃(⋅⋅∘|∘|⋅∘)
+  # -- runtime stackid count
+  ⍜(RtTempStacks) (
+    # -- tempstacks stackid count
+    :
+    ⍜(°□⊡) (↘:)
+  )
+)
 
 # {sig} runtime -- runtime'
 PushSig ← NotImplemented "PushSig"
@@ -500,11 +597,11 @@ AnalyzeInstr ← (
 
         | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
 
-        | ∘ # CopyToTemp
+        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
 
-        | ∘ # CopyFromTemp
+        | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
 
-        | ∘ # DropTemp
+        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
 
         | ∘ # PushSig
 
@@ -602,7 +699,7 @@ Run ← (|1
   # -- callstack instrs
   ⊙EmptyStack # stack
   # -- callstack stack instrs
-  ⊙⊙{⊂ {"Inline"} EmptyStack ⊂ {"Under"} EmptyStack}
+  ⊙⊙{EmptyStack EmptyStack}
   # -- callstack stack tempstacks instrs
   MakeRuntime # -- runtime instrs
   ⍢(
@@ -835,8 +932,13 @@ RunTests ← &p⍜now(
     $ ⊙⊙∘ 100 200 300
     $ ⊙⋅⋅⊙100 200 300 400 500
     $ ⊙⋅⋅⊙∘ 100 200 300 400 500
+    $ ⊃(×2|+1) 100
+    $ ⊃(×2+|+1) 100 200 300
+    $ ⊃(×2|⊙∘) 10 100 1000
 
     $ ⍜(×10) ⁅ 1.234
+    $ ⍜⊢(×2) [1 2 3]
+    $ ⊢⇌[1 2 3]
   }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
