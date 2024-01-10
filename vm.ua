@@ -6,63 +6,6 @@ ExpandSlice ← +⊙⇡ °⊟
 
 Log ← &p
 
-Noadic! ← (
-  ^0
-  ⊂□
-)
-
-Monadic! ← (
-  ⊃⊢(↘1)
-  ⍜°□ ^1
-  ⊂
-)
-
-MonadicNoOutput! ← (
-  ⊃⊢(↘1)
-  °□
-  ^1.0
-)
-
-MonadicTwoOutput! ← (
-  ⊃⊢(↘1)
-  °□
-  ^1.2
-  ⊂{⊙∘}
-)
-
-Dyadic! ← (
-  ⊃↙↘ 2
-  °{⊙∘}
-  ^2
-  ⊂□
-)
-
-DyadicNoOutput! ← (
-  ⊃↙↘ 2
-  °{⊙∘}
-  ^2.0
-)
-
-DyadicTwoOutput! ← (
-  ⊃↙↘ 2
-  ⍜°{⊙∘} ^2.2
-  ⊂
-)
-
-DyadicThreeOutput! ← (
-  ⊃↙↘ 2
-  °{⊙∘}
-  ^2.3
-  ⊂{⊙⊙∘}
-)
-
-Triadic! ← (
-  ⊃↙↘ 3
-  °{⊙⊙∘}
-  ^3
-  ⊂□
-)
-
 # map -- keys
 MapKeys ← ▽ ≡(¬≍NaN °□). °□⊢
 
@@ -83,11 +26,16 @@ Switch ← (
   ⊙(⊐≡∘) °{⊙∘}↙2 ;°{⊙∘} # get fncount, sig
   # -- fncount sig stack
   ⊃(
-    ↘ +⊙⊢ +1     # remaining stack
-  | °□⊡ ⊙⋅∘      # selector: after fns
-  | ⇌↙ ⊙⋅∘       # fns, reversed
-  | ⋅∘           # keep sig
+    ↘ +⊙⊢ +1 # remaining stack
+
+  | °□⊡ ⊙⋅∘ # selector: after fns
+
+  | ⇌↙ ⊙⋅∘ # fns, reversed
+
+  | ⋅∘ # keep sig
+
   | ↘⊃∘(↙ +⊙⊢)+1 # inputs: after fns and selector
+
   )
   # -- stack' selector fns sig newstack
   ⊙(
@@ -97,18 +45,22 @@ Switch ← (
     # -- fnsig slice sig newstack
     # compute args to discard
     ⊃(
-      ⋅∘         # keep slice
+      ⋅∘ # keep slice
+
     | /-⇌ - ⊙⋅⊙∘ # (sig.args - f.sig.args) - (sig.outputs - f.sig.outputs)
       # -- discardcount newstack
       ↘ ¯ # discard extra args
+
     )
     # -- slice newstack
     [MakeFrame]
     # -- [newframe] newstack
+
   )
   # -- stack [newframe] newstack
   ⊃(⊂:⊙⋅∘|⋅∘)
   # -- stack' [newframe]
+
 )
 
 # fn on stack = [ sig slice ]
@@ -120,6 +72,157 @@ PushFunc ← (
   ⊟              # couple them
   ⊂□             # push fn
   ⊙[]            # no new frame
+
+)
+
+Trace ← ⊃∘(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_")
+
+Stack ← ⊃∘(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌)
+
+Args ← ↘1 &args
+
+NoadicNoOutputNames ← {"stack"}
+NoadicNoOutputFns ← (Stack|⍤"bad prim id"0)
+
+NoadicOneOutputNames ← {"tag" "now" "eta" "pi" "tau" "infinity" "scan_line" "rand" "args"}
+NoadicOneOutputFns ← (tag|now|η|π|τ|∞|&sc|⚂|Args)
+
+MonadicNoOutputNames ← {"pop" "show" "prin" "print" "change_directory" "im_show"}
+MonadicNoOutputFns ← (;|&s|&pf|&p|&cd|&ims)
+
+MonadicOneOutputNames ← {
+  "identity" "trace"
+  "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
+  "len" "shape" "range" "first" "reverse" "deshape" "fix" "bits" "transpose" "rise" "fall"
+  "where" "classify" "deduplicate" "box" "unbox" "parse"
+  "utf" "type" "f_read_all_bytes" "f_read_all_str"}
+MonadicOneOutputFns ← (
+  ∘
+| Trace
+| ¬
+| ±
+| ¯
+| ⌵
+| √
+| ○
+| ⌊
+| ⌈
+| ⁅
+| ⧻
+| △
+| ⇡
+| ⊢
+| ⇌
+| ♭
+| ¤
+| ⋯
+| ⍉
+| ⍏
+| ⍖
+| ⊚
+| ⊛
+| ⊝
+| □
+| °□
+| ⋕
+| utf
+| type
+| &frab
+| &fras
+)
+
+MonadicTwoOutputNames ← {"dup" "gen"}
+MonadicTwoOutputFns ← (.|gen)
+
+DyadicNoOutputNames ← {"assert" "f_write_all"}
+DyadicNoOutputFns ← (⍤|&fwa)
+
+DyadicOneOutputNames ← {
+  "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
+  "match" "couple" "join" "select" "pick" "reshape" "rerank" "take" "drop" "rotate" "windows" "keep" "find" "member" "index_of"
+  "deal" "map" "has" "get" "remove" "regex"}
+DyadicOneOutputFns ← (
+  =
+| ≠
+| <
+| ≤
+| >
+| ≥
+| +
+| -
+| ×
+| ÷
+| ◿
+| ⁿ
+| ₙ
+| ↧
+| ↥
+| ∠
+| ℂ
+| ≍
+| ⊟
+| ⊂
+| ⊏
+| ⊡
+| ↯
+| ☇
+| ↙
+| ↘
+| ↻
+| ◫
+| ▽
+| ⌕
+| ∊
+| ⊗
+| deal
+| map
+| has
+| get
+| remove
+| regex
+)
+
+DyadicTwoOutputNames ← {"flip"}
+DyadicTwoOutputFns ← (:|⍤"bad prim id"0)
+
+DyadicThreeOutputNames ← {"over"}
+DyadicThreeOutputFns ← (,|⍤"bad prim id"0 ,)
+
+TriadicNoOutputNames ← {"insert"}
+TriadicOneOutputFns ← (insert|⍤"bad prim id"0 ⋅⋅∘)
+
+PrimNameLists ← {
+  NoadicNoOutputNames
+  NoadicOneOutputNames
+  MonadicNoOutputNames
+  MonadicOneOutputNames
+  MonadicTwoOutputNames
+  DyadicNoOutputNames
+  DyadicOneOutputNames
+  DyadicTwoOutputNames
+  DyadicThreeOutputNames
+  TriadicNoOutputNames}
+
+PrimIds ← ≡(□≡⊂⊙°□) ⊃(⇡⧻|≡(□⇡⧻)) PrimNameLists
+
+PrimNamesToIds ← map ∩⊐/⊂ PrimNameLists PrimIds
+
+ExecPrimitive ← (
+  °⊟ get: PrimNamesToIds ⊢
+  (
+    NoadicNoOutputFns
+  | ⊂□ NoadicOneOutputFns
+  | MonadicNoOutputFns ⊙⊃(°□⊢|↘1)
+  | ⊂□ MonadicOneOutputFns ⊙⊃(°□⊢)(↘1)
+  | ⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢)(↘1)
+  | DyadicNoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
+  | ⊂□ DyadicOneOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
+  | ⊂{⊙∘} DyadicTwoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
+  | ⊂{⊙⊙∘} DyadicThreeOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
+  | ⊂□ TriadicOneOutputFns ⊙⊃(°{⊙⊙∘}↙3|↘3)
+  )
+  ⊙[] # no new frame
+
 )
 
 # instr stack -- stack' newframe?
@@ -127,8 +230,10 @@ ExecuteInstruction ← (|2.2
   type.
   (
     ⊙[] ⊂□ # number literal
+
   | ⊙[] ⍤$"complex in JSON? _"⊙0
   | ⊙[] ⊂□ # string literal
+
   | type°□⊢.
     (
       # array literal: [ type shape elements ]
@@ -153,128 +258,8 @@ ExecuteInstruction ← (|2.2
       )
       ⊙[]
     | ⊙[] ⍤$"complex in JSON? _"⊙0
-    | ⊗: {"stack"
-
-          "tag" "now" "eta" "pi" "tau" "infinity" "scan_line" "rand" "args"
-
-          "pop" "show" "prin" "print" "change_directory" "im_show"
-
-          "identity" "trace"
-          "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
-          "len" "shape" "range" "first" "reverse" "deshape" "fix" "bits" "transpose" "rise" "fall" "where" "classify" "deduplicate" "box" "unbox" "parse"
-          "utf" "type" "f_read_all_bytes" "f_read_all_str"
-
-          "dup" "gen"
-
-          "assert" "f_write_all"
-
-          "eq" "ne" "lt" "le" "gt" "ge" "add" "sub" "mul" "div" "mod" "pow" "log" "min" "max" "atan" "complex"
-          "match" "couple" "join" "select" "pick" "reshape" "rerank" "take" "drop" "rotate" "windows" "keep" "find" "member" "index_of"
-          "deal" "map" "has" "get" "remove" "regex"
-
-          "flip"
-
-          "over"
-
-          "insert"} ⊢.
-      (
-        ⋅(&p$"┌╴?\n_\n└╴╴╴╴"/⊐$"_\n_"≡(□$"├╴_"°□)⇌.) # stack
-        | ⋅Noadic!tag
-        | ⋅Noadic!now
-        | ⋅Noadic!η
-        | ⋅Noadic!π
-        | ⋅Noadic!τ
-        | ⋅Noadic!∞
-        | ⋅Noadic!&sc
-        | ⋅Noadic!⚂
-        | ⋅Noadic!(↘1 &args)
-        | ⋅MonadicNoOutput!;
-        | ⋅MonadicNoOutput!&s
-        | ⋅MonadicNoOutput!&pf
-        | ⋅MonadicNoOutput!&p
-        | ⋅MonadicNoOutput!&cd
-        | ⋅MonadicNoOutput!&ims
-        | ⋅Monadic!∘
-        | ⋅Monadic!(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_") # trace
-        | ⋅Monadic!¬
-        | ⋅Monadic!±
-        | ⋅Monadic!¯
-        | ⋅Monadic!⌵
-        | ⋅Monadic!√
-        | ⋅Monadic!○
-        | ⋅Monadic!⌊
-        | ⋅Monadic!⌈
-        | ⋅Monadic!⁅
-        | ⋅Monadic!⧻
-        | ⋅Monadic!△
-        | ⋅Monadic!⇡
-        | ⋅Monadic!⊢
-        | ⋅Monadic!⇌
-        | ⋅Monadic!♭
-        | ⋅Monadic!¤
-        | ⋅Monadic!⋯
-        | ⋅Monadic!⍉
-        | ⋅Monadic!⍏
-        | ⋅Monadic!⍖
-        | ⋅Monadic!⊚
-        | ⋅Monadic!⊛
-        | ⋅Monadic!⊝
-        | ⋅Monadic!□
-        | ⋅Monadic!°□
-        | ⋅Monadic!⋕
-        | ⋅Monadic!utf
-        | ⋅Monadic!type
-        | ⋅Monadic!&frab
-        | ⋅Monadic!&fras
-        | ⋅MonadicTwoOutput!.
-        | ⋅MonadicTwoOutput!gen
-        | ⋅DyadicNoOutput!⍤
-        | ⋅DyadicNoOutput!&fwa
-        | ⋅Dyadic!=
-        | ⋅Dyadic!≠
-        | ⋅Dyadic!<
-        | ⋅Dyadic!≤
-        | ⋅Dyadic!>
-        | ⋅Dyadic!≥
-        | ⋅Dyadic!+
-        | ⋅Dyadic!-
-        | ⋅Dyadic!×
-        | ⋅Dyadic!÷
-        | ⋅Dyadic!◿
-        | ⋅Dyadic!ⁿ
-        | ⋅Dyadic!ₙ
-        | ⋅Dyadic!↧
-        | ⋅Dyadic!↥
-        | ⋅Dyadic!∠
-        | ⋅Dyadic!ℂ
-        | ⋅Dyadic!≍
-        | ⋅Dyadic!⊟
-        | ⋅Dyadic!⊂
-        | ⋅Dyadic!⊏
-        | ⋅Dyadic!⊡
-        | ⋅Dyadic!↯
-        | ⋅Dyadic!☇
-        | ⋅Dyadic!↙
-        | ⋅Dyadic!↘
-        | ⋅Dyadic!↻
-        | ⋅Dyadic!◫
-        | ⋅Dyadic!▽
-        | ⋅Dyadic!⌕
-        | ⋅Dyadic!∊
-        | ⋅Dyadic!⊗
-        | ⋅Dyadic!deal
-        | ⋅Dyadic!map
-        | ⋅Dyadic!has
-        | ⋅Dyadic!get
-        | ⋅Dyadic!remove
-        | ⋅Dyadic!regex
-        | ⋅DyadicTwoOutput!:
-        | ⋅DyadicThreeOutput!,
-        | ⋅Triadic!insert
-        | ⍤$"unknown instr: _"⊙0
-      )
-      ⊙[] # no new frame
-    |     # { "Instr": [ args… ] }
+    | ExecPrimitive
+    | # { "Instr": [ args… ] }
       ⊢ MapPairs
       ⊗: {"PushFunc" "Switch"} ⊢.
       (
@@ -300,23 +285,29 @@ Advance ← (|3.2
       ⍜°{⊙∘} (|4.4
         # -- pc addrs stack instrs
         ⊃(
-          +1⊙∘             # advance pc, keep addrs
+          +1⊙∘ # advance pc, keep addrs
+
             |              # -- pc addrs stack instrs
           ⊃(°□⊡⊡ ⊙⊙⋅∘|⋅⋅∘) # pick addr then pick next instr, keep stack
           # -- instr stack
           ExecuteInstruction
           # -- stack' newframe?
+
         )
         # -- pc addrs stack newframe?
+
       )
       # -- callstack' stack newframe?
       ⊃(
         ⊂: ⊙⋅∘ # push new frame (if it exists) on top of callstack
-        | ⋅∘   # keep stack
+
+        | ⋅∘ # keep stack
+
       )
     | # yes: destroy it
       ⋅[]
       ⊙∘ # keep stack
+
     )
   )
 )
@@ -331,6 +322,7 @@ Run ← (|1
   ⊃(
     ⊐≡≡∘°□get "top_slices"
     ≡MakeFrame # initial callstack from top_slices
+
   | °□get "instrs"
   )
   # -- callstack instrs
@@ -338,10 +330,12 @@ Run ← (|1
   # -- callstack stack instrs
   ⍢(
     |3.3 ⊃Advance⋅⋅∘ # keep instrs
+
   | CallStackActive ⊙⋅∘
   )
   # -- callstack stack instrs
   ⋅⊙; # drop callstack and instrs
+
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
@@ -395,6 +389,7 @@ MakeCheckProgram ← (
   $ # Experimental!
   $ Check ← &i "_" "Check"
   $ Check {_} _
+
 )
 
 # expr -- success
@@ -405,7 +400,9 @@ AutoCheck ← (|1
   # -- exitcode stdout stderr
   ⊃(
     ↧ ∩(=0) ⊙⋅⧻ # success is exitcode=0 && empty stderr
-  | ⋅⊂          # join stderr to stdout
+
+  | ⋅⊂ # join stderr to stdout
+
   )
   # -- success output expr
   (
@@ -535,8 +532,7 @@ RunTests ← &p⍜now(
     $ (*2|*4+)0 10 20
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
-
-    ""  }
+  }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
   Parallel!(AutoCheck °□)
@@ -547,10 +543,12 @@ RunTests ← &p⍜now(
 ¬IsImported
 (
   # imported: do nothing
+
 | # running
   =1⧻&args
   (
     # do nothing
+
   | RunTests
   )
 )
@@ -559,10 +557,12 @@ RunTests ← &p⍜now(
 ¬IsImported
 (
   # imported: do nothing
+
 | # running
   >1⧻&args
   (
     # do nothing
+
   | Main
   )
 )
