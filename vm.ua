@@ -55,15 +55,15 @@ Triadic! ← (
 MapKeys ← ▽ ≡(¬≍NaN °□). °□⊢
 
 # map -- pairs
-MapPairs ← ⍉⊟ ∩▽ ,: ≡(¬≍NaN °□). °{⊙∘}
+MapPairs ← ⍉⊟°map
 
 EmptyStack ← {}
 
-# slice stack -- frame
-MakeFrame ← (|2
+# slice -- frame
+MakeFrame ← (|1
   ExpandSlice
   0 # pc
-  {⊙⊙∘}
+  {⊙∘}
 )
 
 # { Switch { count, sig, span } } stack -- stack' newframe?
@@ -92,8 +92,11 @@ Switch ← (
     )
     # -- slice newstack
     [MakeFrame]
+    # -- [newframe] newstack
   )
-  # -- stack [newframe]
+  # -- stack [newframe] newstack
+  ⊃(⊂:⊙⋅∘|⋅∘)
+  # -- stack' [newframe]
 )
 
 # fn on stack = [ sig slice ]
@@ -265,56 +268,59 @@ ExecuteInstruction ← (|2.2
 # frame = { pc addrs stack }
 
 # frame -- bool
-FrameDone ← ≤ ⊙⧻ °{⊙∘}↙2
+FrameDone ← ≤ ⊙⧻ °{⊙∘}
 
-# callstack instrs -- callstack'
-Advance ← (|2
-  FrameDone ⊢ . # reached end of top frame?
-  (
-    # no, proceed
-    ⍜⊢(
-      ⍜(°{⊙⊙∘}) (
+# callstack stack instrs -- callstack' stack'
+Advance ← (|3.2
+  ⍜⊢(
+    FrameDone. # reached end of top frame?
+    (
+      # no, go on
+      ⍜°{⊙∘} (|4.4
         # -- pc addrs stack instrs
         ⊃(
-          +1     # advance pc
-            | ⋅∘ # keep addrs
-            |    # -- pc addrs stack instrs
-
-          ⊃(°□⊡⊡ ⊙⊙⋅∘|⋅⋅∘) # fetch next instr, keep stack
-
+          +1⊙∘             # advance pc, keep addrs
+            |              # -- pc addrs stack instrs
+          ⊃(°□⊡⊡ ⊙⊙⋅∘|⋅⋅∘) # pick addr then pick next instr, keep stack
           # -- instr stack
           ExecuteInstruction
           # -- stack' newframe?
         )
         # -- pc addrs stack newframe?
       )
-      # -- frame newframe?
-      ⊂: # push new frame (if it exists) on top of callstack
+      # -- callstack' stack newframe?
+      ⊃(
+        ⊂: ⊙⋅∘ # push new frame (if it exists) on top of callstack
+        | ⋅∘   # keep stack
+      )
+    | # yes: destroy it
+      ⋅[]
+      ⊙∘ # keep stack
     )
-  | # yes: pop it and merge its stack with previous frame
-    ⊃(↘1|°□⊡0_2)
-    ⍜(°□⊡0_2)⊂
   )
 )
 
+# callstack -- bool
 CallStackActive ← (
-  (¬FrameDone °[∘]|1)>1⧻.
+  (¬FrameDone °[∘]|1) >1⧻.
 )
 
 # jsonasm -- finalstack
 Run ← (|1
   ⊃(
     ⊐≡≡∘°□get "top_slices"
-    ≡(MakeFrame : EmptyStack) # initial callstack from top_slices
+    ≡MakeFrame # initial callstack from top_slices
   | °□get "instrs"
   )
   # -- callstack instrs
+  ⊙EmptyStack # stack
+  # -- callstack stack instrs
   ⍢(
-    ⊃Advance(⋅∘)
-  | CallStackActive
+    |3.3 ⊃Advance⋅⋅∘ # keep instrs
+  | CallStackActive ⊙⋅∘
   )
-  ⊙;            # drop instrs
-  ⋅⋅∘ °{⊙⊙∘} ⊢⇌ # final stack from top frame
+  # -- callstack stack instrs
+  ⋅⊙; # drop callstack and instrs
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
