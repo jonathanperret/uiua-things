@@ -226,7 +226,7 @@ ExecPrimitive ← (
 )
 
 # instr stack -- stack' newframe?
-ExecuteInstruction ← (|2.2
+ExecuteInstr ← (|2.2
   type.
   (
     ⊙[] ⊂□ # number literal
@@ -271,42 +271,32 @@ ExecuteInstruction ← (|2.2
   )
 )
 
-# frame = { pc addrs stack }
+# frame = { pc addrs }
 
 # frame -- bool
 FrameDone ← ≤ ⊙⧻ °{⊙∘}
 
+# frame instrs -- instr
+FrameGetInstr ← °□⊡⊡ °{⊙∘}
+
 # callstack stack instrs -- callstack' stack'
 Advance ← (|3.2
   ⍜⊢(
+    ⊙:         # -- frame instrs stack
     FrameDone. # reached end of top frame?
     (
       # no, go on
-      ⍜°{⊙∘} (|4.4
-        # -- pc addrs stack instrs
-        ⊃(
-          +1⊙∘ # advance pc, keep addrs
-
-            |              # -- pc addrs stack instrs
-          ⊃(°□⊡⊡ ⊙⊙⋅∘|⋅⋅∘) # pick addr then pick next instr, keep stack
-          # -- instr stack
-          ExecuteInstruction
-          # -- stack' newframe?
-
-        )
-        # -- pc addrs stack newframe?
-
-      )
-      # -- callstack' stack newframe?
       ⊃(
-        ⊂: ⊙⋅∘ # push new frame (if it exists) on top of callstack
+        ⍜⊢ (+1) # bump pc
 
-        | ⋅∘ # keep stack
+        | : ExecuteInstr FrameGetInstr
+        # -- newframe? stack'
 
       )
-    | # yes: destroy it
-      ⋅[]
-      ⊙∘ # keep stack
+      # -- frame newframe?  stack
+      ⊂: # push new frame (if it exists) on top of callstack
+
+    | []⋅⋅∘ # yes: destroy it, keep stack
 
     )
   )
