@@ -14,6 +14,14 @@ MapPairs ← ⍉⊟°map
 
 EmptyStack ← {}
 
+# runtime = { callstack stack tempstacks }
+
+MakeRuntime ← {⊙⊙∘}
+
+RtCallStack ← °□⊡0
+RtStack ← °□⊡1
+RtTempStacks ← °□⊡2
+
 # slice -- frame
 MakeFrame ← (|1
   ExpandSlice
@@ -155,6 +163,7 @@ PrimIds ← ≡(□≡⊂⊙°□) ⊃(⇡⧻|≡(□⇡⧻)) PrimNameLists
 
 PrimNamesToIds ← map ∩⊐/⊂ PrimNameLists PrimIds
 
+# primid stack -- stack'
 ExecPrimitive ← (
   °⊟
   (
@@ -169,111 +178,176 @@ ExecPrimitive ← (
   | ⊂{⊙⊙∘} DyadicThreeOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
   | ⊂□ TriadicOneOutputFns ⊙⊃(°{⊙⊙∘}↙3|↘3)
   )
-  ⊙[] # no new frame
-
 )
 
-NotImplemented ← |3.2 ⊙∘ ⍤⊙0 $"_ is not implemented"
+NotImplemented ← |2 ∘ ⍤⊙0 $"_ is not implemented"
 
-# {ident} stack -- stack' newframe?
+# {ident} runtime -- runtime'
 Comment ← NotImplemented "Comment"
-# {index call sig} stack -- stack' newframe?
+
+# {index call sig} runtime -- runtime'
 CallGlobal ← NotImplemented "CallGlobal"
-# {span index} stack -- stack' newframe?
+
+# {span index} runtime -- runtime'
 BindGlobal ← NotImplemented "BindGlobal"
-# { } stack -- stack' newframe?
+
+# { } runtime -- runtime'
 BeginArray ← NotImplemented "BeginArray"
-# {boxed span} stack -- stack' newframe?
+
+# {boxed span} runtime -- runtime'
 EndArray ← NotImplemented "EndArray"
-# {index} stack -- stack' newframe?
+
+# {index} runtime -- runtime'
 Call ← NotImplemented "Call"
 
-# { id  sig  slice } stack -- stack' newframe?
+# [ sig slice ] runtime -- runtime'
 PushFunc ← (
-  ;°{⊙⊙∘} # get slice and sig
-  ∩⊐≡∘    # clean them up
-  ⊟       # couple them
-  ⊂□      # push fn
-  ⊙[]     # no new frame
-
-)
-
-# { count sig span } stack -- stack' newframe?
-Switch ← (|2.2
-  ⊙(⊐≡∘) °{⊙∘}↙2 # get fncount, cleaned sig
-  # -- fncount sig stack
-  ⊃(
-    °□⊡ ⊙⋅∘ # selector: after fns
-
-  | ⇌↙ ⊙⋅∘ # fns, reversed
-
-  | ⋅∘ # keep sig
-
-  | ↘ +1 ⊙⋅∘ # drop fns and selector from stack
+  :
+  ⍜RtStack(
+    :
+    ⊂□ # push fn
 
   )
-  # -- selector fns sig stack'
-  °□⊡ # pick selected fn # TODO: array selectors
-  # -- fn sig stack
-  °⊟ # extract fnsig and fnslice
+)
 
-  # -- fnsig fnslice sig stack
-  ⊃(
-    ⊙; # drop fnslice
-    # compute args to discard
-    ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # sig.args stack ((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
-    ⍜↙(↘ ¯:)        # discard extra args
+# {fncount sig} runtime -- runtime'
+Switch ← (|2
+  :
+  ⍜RtStack (
+    :
+    °{⊙∘} # get fncount, sig
+    # -- fncount sig stack
+    ⊃(
+      °□⊡ ⊙⋅∘ # selector: after fns
 
-  | [MakeFrame] ⋅∘
+    | ⇌↙ ⊙⋅∘ # fns, reversed
+
+    | ⋅∘ # keep sig
+
+    | ↘ +1 ⊙⋅∘ # drop fns and selector from stack
+
+    )
+    # -- selector fns sig stack'
+    °□⊡ # pick selected fn # TODO: array selectors
+    # -- fn sig stack
+    °⊟ # extract fnsig and fnslice
+
+    # -- fnsig fnslice sig stack
+    ⊃(
+      ⊙; # drop fnslice
+      # compute args to discard
+      ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # sig.args stack ((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
+      ⍜↙(↘ ¯:)        # discard extra args
+
+    | ⋅∘ # keep fnslice
+
+    )
+    # -- stack fnslice
+
   )
-  # -- stack [newframe]
+  # -- runtime fnslice
+  ⍜RtCallStack(⊂ MakeFrame :) # push new frame onto callstack
 
 )
 
-# {parts span} stack -- stack' newframe?
-Format ← (|2.2
-  °□⊢                   # -- parts stack
-  ⊃(∘|≡⍜°□$"_" ⊃↙↘ -1⧻) # take (parts-1) values from stack, stringify them
-  ♭⍉⬚(□"")⊟             # alternate fragments and values
-  ⊐/⊂                   # join everything up
-  ⊂□                    # push resulting string
-  ⊙[]                   # no new frame
+# parts runtime -- runtime'
+Format ← (|2
+  :
+  ⍜RtStack (
+    :
+    # -- parts stack
+    ⊃(∘|≡⍜°□$"_" ⊃↙↘ -1⧻) # take (parts-1) values from stack, stringify them
+    ♭⍉⬚(□"")⊟             # alternate fragments and values
+    ⊐/⊂                   # join everything up
+    ⊂□                    # push resulting string
 
+  )
 )
 
-# {func} stack -- stack' newframe?
+# {func} runtime -- runtime'
 Dynamic ← NotImplemented "Dynamic"
-# {count span} stack -- stack' newframe?
+
+# {count span} runtime -- runtime'
 PushLocals ← NotImplemented "PushLocals"
-# {} stack -- stack' newframe?
+
+# {} runtime -- runtime'
 PopLocals ← NotImplemented "PopLocals"
-# {index span} stack -- stack' newframe?
+
+# {index span} runtime -- runtime'
 GetLocal ← NotImplemented "GetLocal"
-# {count span unbox} stack -- stack' newframe?
+
+# {count span unbox} runtime -- runtime'
 Unpack ← NotImplemented "Unpack"
-# {count} stack -- stack' newframe?
+
+# {count} runtime -- runtime'
 PushTempFunctions ← NotImplemented "PushTempFunctions"
-# {count} stack -- stack' newframe?
+
+# {count} runtime -- runtime'
 PopTempFunctions ← NotImplemented "PopTempFunctions"
-# {offset sig span} stack -- stack' newframe?
+
+# {offset sig span} runtime -- runtime'
 GetTempFunction ← NotImplemented "GetTempFunction"
-# {count span} stack -- stack' newframe?
-TouchStack ← NotImplemented "TouchStack"
-# {stack count span} stack -- stack' newframe?
-PushTemp ← NotImplemented "PushTemp"
-# {stack count span} stack -- stack' newframe?
-PopTemp ← NotImplemented "PopTemp"
-# {stack count span} stack -- stack' newframe?
+
+# count runtime -- runtime'
+TouchStack ← (|2
+  ⋅∘ # TODO update arraystack
+
+)
+
+# [stackid count] runtime -- runtime'
+PushTemp ← (|2
+  °⊟
+  # -- stackid count runtime
+  ⊃(⋅⋅∘|⋅∘|∘)
+  # -- runtime count stackid
+  # take from stack
+  ⍜RtStack (⊃↘↙ :)
+  # -- runtime' values stackid
+  ⊃(∘|⋅⋅∘|⋅∘)
+  # -- runtime stackid values
+  ⍜(RtTempStacks) (
+    # -- tempstacks stackid values
+    :
+    ⍜(°□⊡) (
+      ⊂⇌:
+    )
+  )
+)
+
+# [stackid count] runtime -- runtime'
+PopTemp ← (|2
+  °⊟
+  # -- stackid count runtime
+  ⊃(⋅⋅∘|∘|⋅∘)
+  # -- runtime stackid count
+  ⍜(RtTempStacks) (
+    # -- tempstacks stackid count
+    :
+    ⍜(°□⊡) (
+      ⊃↘↙ :
+    )
+  )
+  # -- runtime values
+  # push to stack
+  ⍜RtStack (⊂⇌:)
+)
+
+# {stack count span} runtime -- runtime'
 CopyToTemp ← NotImplemented "CopyToTemp"
-# {stack offset count span} stack -- stack' newframe?
+
+# {stack offset count span} runtime -- runtime'
 CopyFromTemp ← NotImplemented "CopyFromTemp"
-# {stack count span} stack -- stack' newframe?
+
+# {stack count span} runtime -- runtime'
 DropTemp ← NotImplemented "DropTemp"
-# {sig} stack -- stack' newframe?
+
+# {sig} runtime -- runtime'
 PushSig ← NotImplemented "PushSig"
-# {} stack -- stack' newframe?
+
+# {} runtime -- runtime'
 PopSig ← NotImplemented "PopSig"
-# {i n} stack -- stack' newframe?
+
+# {i n} runtime -- runtime'
 SetOutputComment ← NotImplemented "SetOutputComment"
 
 InstrTypePush ← 0
@@ -383,26 +457,100 @@ AnalyzeInstr ← (
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
     | # { "Instr": [ args… ] }
       °[{⊙∘}] MapPairs
-      {InstrTypeOther {⊙∘}} get: InstrNamesToIds
+      get: InstrNamesToIds
+      ⊃(⊙∘|∘)
+      (
+        ∘ # Comment
+
+        | ∘ # CallGlobal
+
+        | ∘ # BindGlobal
+
+        | ∘ # BeginArray
+
+        | ∘ # EndArray
+
+        | ∘ # Call
+
+        | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
+
+        | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch
+
+        | °□⊢ # Format
+
+        | ∘ # Dynamic
+
+        | ∘ # PushLocals
+
+        | ∘ # PopLocals
+
+        | ∘ # GetLocal
+
+        | ∘ # Unpack
+
+        | ∘ # PushTempFunctions
+
+        | ∘ # PopTempFunctions
+
+        | ∘ # GetTempFunction
+
+        | °□⊢ # TouchStack
+
+        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
+
+        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
+
+        | ∘ # CopyToTemp
+
+        | ∘ # CopyFromTemp
+
+        | ∘ # DropTemp
+
+        | ∘ # PushSig
+
+        | ∘ # PopSig
+
+        | ∘ # SetOutputComment
+
+      )
+      :
+      {InstrTypeOther {⊙∘}}
     )
   )
 )
 
-# instr stack -- stack' newframe?
-ExecuteInstr ← (|2.2
-  °{⊙∘} # -- instrtype data
+# runtime instr -- runtime'
+ExecInstr ← (|2
+  :
+  # -- instr runtime
+  °{⊙∘} # -- instrtype instrdetail runtime
   (
-    ⊂□  # push
-    ⊙[] # no new frame
+    # push
+    # -- value runtime
+    :
+    # -- runtime value
+    ⍜RtStack(
+      :
+      ⊂□ # push onto stack
 
-  | ExecPrimitive
-  | # jsoninstrid jsoninstr
-    °{⊙∘}
+    )
+  | # prim
+    # -- primid runtime
+    :
+    # -- runtime primid
+    ⍜RtStack(
+      :
+      ExecPrimitive
+    )
+  | # other
+    # -- jsoninstr runtime
+    °{⊙∘} # -- jsoninstrid jsoninstr runtime
     InstrFns
   )
 )
 
 # frame = { pc addrs }
+FramePc ← ⊢
 
 # frame -- bool
 FrameDone ← ≤ ⊙⧻ °{⊙∘}
@@ -410,26 +558,30 @@ FrameDone ← ≤ ⊙⧻ °{⊙∘}
 # frame instrs -- instr
 FrameGetInstr ← °□⊡⊡ °{⊙∘}
 
-# callstack stack instrs -- callstack' stack'
-Advance ← (|3.2
-  ⍜⊢(
-    ⊙:         # -- frame instrs stack
-    FrameDone. # reached end of top frame?
-    (
-      # no, go on
+# runtime instrs -- runtime'
+Advance ← (|2
+  # -- runtime instrs
+  ⊃(FrameDone ⊢RtCallStack|∘)
+  # reached end of top frame?
+  (
+    |2 # no, go on
+    # -- runtime instrs
+    ⍜(⊢RtCallStack)(|2.2
+      # -- topframe instrs
       ⊃(
-        ⍜⊢ (+1) # bump pc
+        ⍜FramePc (+1) # bump pc
 
-        | : ExecuteInstr FrameGetInstr
-        # -- newframe? stack'
+        | FrameGetInstr # fetch next instr
 
       )
-      # -- frame newframe?  stack
-      ⊂: # push new frame (if it exists) on top of callstack
-
-    | []⋅⋅∘ # yes: destroy it, keep stack
-
     )
+    # -- runtime' instr
+    ExecInstr
+    # -- runtime
+
+  | |1 # yes: destroy it, keep stack
+    # -- runtime
+    ⍜RtCallStack (↘1)
   )
 )
 
@@ -450,13 +602,17 @@ Run ← (|1
   # -- callstack instrs
   ⊙EmptyStack # stack
   # -- callstack stack instrs
+  ⊙⊙{⊂ {"Inline"} EmptyStack ⊂ {"Under"} EmptyStack}
+  # -- callstack stack tempstacks instrs
+  MakeRuntime # -- runtime instrs
   ⍢(
-    |3.3 ⊃Advance⋅⋅∘ # keep instrs
+    |2.2 Advance ⊙. # keep instrs
 
-  | CallStackActive ⊙⋅∘
+  | CallStackActive °□⊢
   )
-  # -- callstack stack instrs
-  ⋅⊙; # drop callstack and instrs
+  # -- runtime instrs
+  ⊙;      # drop instrs
+  RtStack # extract stack
 
 )
 
@@ -523,7 +679,6 @@ MakeCheckProgram ← (
   $ _
   $ }
   $ Check: _
-  # &p$"---\n_\n---" .
 
 )
 
@@ -548,8 +703,10 @@ AutoCheck ← (|1
   )
 )
 
+ThreadCount ← NumProcs
+
 Parallel! ← (
-  ⊐/⊂ ≡(□≡wait ≡spawn^1 ▽≡(¬≍□0).) ⬚(□0)↯ ⊟ NumProcs ¯1
+  ⊐/⊂ ▽≡⧻. ≡(□≡wait ≡spawn^1 ▽≡(¬≍□0).) ⬚(□0)↯ ⊟ :ThreadCount ¯1
 )
 
 RunTests ← &p⍜now(
@@ -669,18 +826,23 @@ RunTests ← &p⍜now(
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
 
-    $ F=+123\tF 4
+    $ F ← +123\tF 4
 
     $ $"\_" 100
     $ $"[x=\_ y=\_]" 100 200
+
+    $ ⊙100 200
+    $ ⊙⊙∘ 100 200 300
+    $ ⊙⋅⋅⊙100 200 300 400 500
+    $ ⊙⋅⋅⊙∘ 100 200 300 400 500
+
+    $ ⍜(×10) ⁅ 1.234
   }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
   Parallel!(AutoCheck °□)
-  # ≡(AutoCheck °□)
   &p⊡:"😭🎉" /↧
 )
-
 ¬IsImported
 (
   # imported: do nothing
