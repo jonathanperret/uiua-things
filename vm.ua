@@ -21,59 +21,7 @@ MakeFrame ← (|1
   {⊙∘}
 )
 
-# { count sig span } stack -- stack' newframe?
-Switch ← (
-  ⊙(⊐≡∘) °{⊙∘}↙2 # get fncount, sig
-  # -- fncount sig stack
-  ⊃(
-    ↘ +⊙⊢ +1 # remaining stack
-
-  | °□⊡ ⊙⋅∘ # selector: after fns
-
-  | ⇌↙ ⊙⋅∘ # fns, reversed
-
-  | ⋅∘ # keep sig
-
-  | ↘⊃∘(↙ +⊙⊢)+1 # inputs: after fns and selector
-
-  )
-  # -- stack' selector fns sig newstack
-  ⊙(
-    °□⊡ # pick selected fn # TODO: array selectors
-    # -- fn sig newstack
-    °⊟ # extract fnsig and fnslice
-    # -- fnsig slice sig newstack
-    # compute args to discard
-    ⊃(
-      ⋅∘ # keep slice
-
-    | /-⇌ - ⊙⋅⊙∘ # (sig.args - f.sig.args) - (sig.outputs - f.sig.outputs)
-      # -- discardcount newstack
-      ↘ ¯ # discard extra args
-
-    )
-    # -- slice newstack
-    [MakeFrame]
-    # -- [newframe] newstack
-
-  )
-  # -- stack [newframe] newstack
-  ⊃(⊂:⊙⋅∘|⋅∘)
-  # -- stack' [newframe]
-
-)
-
 # fn on stack = [ sig slice ]
-
-# { id  sig  slice } stack -- stack' newframe?
-PushFunc ← (
-  ;°{⊙⊙∘} # get slice and sig
-  ∩⊐≡∘    # clean them up
-  ⊟       # couple them
-  ⊂□      # push fn
-  ⊙[]     # no new frame
-
-)
 
 Trace ← ⊃∘(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_")
 
@@ -225,12 +173,175 @@ ExecPrimitive ← (
 
 )
 
+# enum InstrRep {
+#     Comment(Ident),
+#     CallGlobal(usize, bool, Signature),
+#     BindGlobal(usize, usize),
+#     BeginArray,
+#     EndArray(bool, usize),
+#     Call(usize),
+#     PushFunc(Function),
+#     Switch(usize, Signature, usize),
+#     Format(EcoVec<EcoString>, usize),
+#     Dynamic(DynamicFunction),
+#     PushLocals(usize, usize),
+#     PopLocals,
+#     GetLocal(usize, usize),
+#     Unpack(usize, usize, bool),
+#     PushTempFunctions(usize),
+#     PopTempFunctions(usize),
+#     GetTempFunction(usize, Signature, usize),
+#     TouchStack(usize, usize),
+#     PushTemp(TempStack, usize, usize),
+#     PopTemp(TempStack, usize, usize),
+#     CopyToTemp(TempStack, usize, usize),
+#     CopyFromTemp(TempStack, usize, usize, usize),
+#     DropTemp(TempStack, usize, usize),
+#     PushSig(Signature),
+#     PopSig,
+#     SetOutputComment(usize, usize),
+#     #[serde(untagged)]
+#     Push(Value),
+#     #[serde(untagged)]
+#     Prim(Primitive, usize),
+#     #[serde(untagged)]
+#     ImplPrim(ImplPrimitive, usize),
+# }
+
 InstrTypePush ← 0
 InstrTypePrim ← 1
 InstrTypeOther ← 2
 
-InstrNames ← {"PushFunc" "Switch"}
-InstrFns ← |3.2 (PushFunc|Switch)
+NotImplemented ← |2.2 ⍤"not implemented"0 ⊙∘
+
+Comment ← NotImplemented
+CallGlobal ← NotImplemented
+BindGlobal ← NotImplemented
+BeginArray ← NotImplemented
+EndArray ← NotImplemented
+Call ← NotImplemented
+
+# { id  sig  slice } stack -- stack' newframe?
+PushFunc ← (
+  ;°{⊙⊙∘} # get slice and sig
+  ∩⊐≡∘    # clean them up
+  ⊟       # couple them
+  ⊂□      # push fn
+  ⊙[]     # no new frame
+
+)
+
+# { count sig span } stack -- stack' newframe?
+Switch ← (|2.2
+  ⊙(⊐≡∘) °{⊙∘}↙2 # get fncount, cleaned sig
+  # -- fncount sig stack
+  ⊃(
+    °□⊡ ⊙⋅∘ # selector: after fns
+
+  | ⇌↙ ⊙⋅∘ # fns, reversed
+
+  | ⋅∘ # keep sig
+
+  | ↘ +1 ⊙⋅∘ # drop fns and selector from stack
+
+  )
+  # -- selector fns sig stack'
+  °□⊡ # pick selected fn # TODO: array selectors
+  # -- fn sig stack
+  °⊟ # extract fnsig and fnslice
+
+  # -- fnsig fnslice sig stack
+  ⊃(
+    ⊙; # drop fnslice
+    # compute args to discard
+    ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # sig.args stack ((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
+    ⍜↙(↘ ¯:)        # discard extra args
+
+  | [MakeFrame] ⋅∘
+  )
+  # -- stack [newframe]
+
+)
+
+Format ← NotImplemented
+Dynamic ← NotImplemented
+PushLocals ← NotImplemented
+PopLocals ← NotImplemented
+GetLocal ← NotImplemented
+Unpack ← NotImplemented
+PushTempFunctions ← NotImplemented
+PopTempFunctions ← NotImplemented
+GetTempFunction ← NotImplemented
+TouchStack ← NotImplemented
+PushTemp ← NotImplemented
+PopTemp ← NotImplemented
+CopyToTemp ← NotImplemented
+CopyFromTemp ← NotImplemented
+DropTemp ← NotImplemented
+PushSig ← NotImplemented
+PopSig ← NotImplemented
+SetOutputComment ← NotImplemented
+
+InstrNames ← {
+  "Comment"
+  "CallGlobal"
+  "BindGlobal"
+  "BeginArray"
+  "EndArray"
+  "Call"
+  "PushFunc"
+  "Switch"
+  "Format"
+  "Dynamic"
+  "PushLocals"
+  "PopLocals"
+  "GetLocal"
+  "Unpack"
+  "PushTempFunctions"
+  "PopTempFunctions"
+  "GetTempFunction"
+  "TouchStack"
+  "PushTemp"
+  "PopTemp"
+  "CopyToTemp"
+  "CopyFromTemp"
+  "DropTemp"
+  "PushSig"
+  "PopSig"
+  "SetOutputComment"}
+
+InstrFns ← (
+  Comment
+| CallGlobal
+| BindGlobal
+| BeginArray
+| EndArray
+| Call
+| PushFunc
+| Switch
+| Format
+| Dynamic
+| PushLocals
+| PopLocals
+| GetLocal
+| Unpack
+| PushTempFunctions
+| PopTempFunctions
+| GetTempFunction
+| TouchStack
+| PushTemp
+| PopTemp
+| CopyToTemp
+| CopyFromTemp
+| DropTemp
+| PushSig
+| PopSig
+| SetOutputComment
+)
+
+InstrNamesToIds ← map ⊃(∘|⇡⧻) InstrNames
+
+# instr = { (push|prim|other) (value|primid|{ instrid args }) }
 
 # jsoninstr -- instr
 AnalyzeInstr ← (
@@ -273,9 +384,8 @@ AnalyzeInstr ← (
     | #  [ "prim", … ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
     | # { "Instr": [ args… ] }
-      °[∘] MapPairs
-      ⍜(°{⊙∘}) (⊗: InstrNames□)
-      {InstrTypeOther ∘}
+      °[{⊙∘}] MapPairs
+      {InstrTypeOther {⊙∘}} get: InstrNamesToIds
     )
   )
 )
@@ -284,16 +394,13 @@ AnalyzeInstr ← (
 ExecuteInstr ← (|2.2
   °{⊙∘} # -- instrtype data
   (
-    ⊂□ # push
-    ⊙[]
+    ⊂□  # push
+    ⊙[] # no new frame
+
   | ExecPrimitive
   | # jsoninstrid jsoninstr
     °{⊙∘}
-    (
-      PushFunc
-    | Switch
-    | ⊙[] ⍤$"unknown instr: _"⊙0
-    )
+    InstrFns
   )
 )
 
@@ -545,8 +652,9 @@ RunTests ← &p⍜now(
 
     $ (10|20)0
     $ (10 20|20 30)1
-    $ (*2|*4+)1 10 20
-    $ (*2|*4+)0 10 20
+    $ (*2|*4+)1 10 90
+    $ (*2|*4+)0 10 90
+    $ (*2|*4+)0 10 90 99
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
   }
