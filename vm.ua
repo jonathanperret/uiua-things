@@ -21,9 +21,9 @@ MakeFrame ← (|1
   {⊙∘}
 )
 
-# { Switch { count, sig, span } } stack -- stack' newframe?
+# { count sig span } stack -- stack' newframe?
 Switch ← (
-  ⊙(⊐≡∘) °{⊙∘}↙2 ;°{⊙∘} # get fncount, sig
+  ⊙(⊐≡∘) °{⊙∘}↙2 # get fncount, sig
   # -- fncount sig stack
   ⊃(
     ↘ +⊙⊢ +1 # remaining stack
@@ -65,13 +65,13 @@ Switch ← (
 
 # fn on stack = [ sig slice ]
 
-# { PushFunc { id, sig, slice } } stack -- stack' newframe?
+# { id  sig  slice } stack -- stack' newframe?
 PushFunc ← (
-  ;°{⊙⊙∘} ;°{⊙∘} # get slice and sig
-  ∩⊐≡∘           # clean them up
-  ⊟              # couple them
-  ⊂□             # push fn
-  ⊙[]            # no new frame
+  ;°{⊙⊙∘} # get slice and sig
+  ∩⊐≡∘    # clean them up
+  ⊟       # couple them
+  ⊂□      # push fn
+  ⊙[]     # no new frame
 
 )
 
@@ -208,7 +208,7 @@ PrimIds ← ≡(□≡⊂⊙°□) ⊃(⇡⧻|≡(□⇡⧻)) PrimNameLists
 PrimNamesToIds ← map ∩⊐/⊂ PrimNameLists PrimIds
 
 ExecPrimitive ← (
-  °⊟ get: PrimNamesToIds ⊢
+  °⊟
   (
     NoadicNoOutputFns
   | ⊂□ NoadicOneOutputFns
@@ -225,48 +225,74 @@ ExecPrimitive ← (
 
 )
 
-# instr stack -- stack' newframe?
-ExecuteInstr ← (|2.2
+InstrTypePush ← 0
+InstrTypePrim ← 1
+InstrTypeOther ← 2
+
+InstrNames ← {"PushFunc" "Switch"}
+InstrFns ← |3.2 (PushFunc|Switch)
+
+# jsoninstr -- instr
+AnalyzeInstr ← (
   type.
   (
-    ⊙[] ⊂□ # number literal
+    {InstrTypePush ∘} # number literal
 
-  | ⊙[] ⍤$"complex in JSON? _"⊙0
-  | ⊙[] ⊂□ # string literal
+  | [] ⍤$"complex in JSON? _"⊙0
+  | {InstrTypePush ∘} # string literal
 
   | type°□⊢.
     (
-      # array literal: [ type shape elements ]
-      ⊙(⊐≡∘) °{⊙⊙∘}
-      (
-        # number array
-        ⊙≡°□
-        | # complex array
-        ⊙≡(ℂ°{:}°□)
-        | # char array
-        ⊙≡°□
-        | # box array
-        ⊙∘
+      |1       # array literal: [ type shape elements ]
+      : °{⊙⊙∘} # -- shape type elements
+      ⊓(
+        ⊐≡∘ # unbox shape
+
+        | # unbox elements
+        (
+          # number array
+          ≡°□
+            | # complex array
+          ≡(ℂ°{:}°□)
+            | # char array
+          ≡°□
+            | # box array
+          ∘
+        )
       )
       # -- shape elements
       ±⧻.
       (
         # scalar (used for char literals)
-        ⊂□ ⊢⊢ ;
+        ⊢⊢ ;
         | # regular array: apply shape
-        ⊂□ ↯
+        ↯
       )
-      ⊙[]
-    | ⊙[] ⍤$"complex in JSON? _"⊙0
-    | ExecPrimitive
+      {InstrTypePush ∘}
+    | [] ⍤$"complex in JSON? _"⊙0
+    | #  [ "prim", … ]
+      {InstrTypePrim ∘} get: PrimNamesToIds ⊢
     | # { "Instr": [ args… ] }
-      ⊢ MapPairs
-      ⊗: {"PushFunc" "Switch"} ⊢.
-      (
-        PushFunc
-        | Switch
-        | ⊙[] ⍤$"unknown instr: _"⊙0
-      )
+      °[∘] MapPairs
+      ⍜(°{⊙∘}) (⊗: InstrNames□)
+      {InstrTypeOther ∘}
+    )
+  )
+)
+
+# instr stack -- stack' newframe?
+ExecuteInstr ← (|2.2
+  °{⊙∘} # -- instrtype data
+  (
+    ⊂□ # push
+    ⊙[]
+  | ExecPrimitive
+  | # jsoninstrid jsoninstr
+    °{⊙∘}
+    (
+      PushFunc
+    | Switch
+    | ⊙[] ⍤$"unknown instr: _"⊙0
     )
   )
 )
@@ -314,6 +340,7 @@ Run ← (|1
     ≡MakeFrame # initial callstack from top_slices
 
   | °□get "instrs"
+    ≡(AnalyzeInstr °□)
   )
   # -- callstack instrs
   ⊙EmptyStack # stack
