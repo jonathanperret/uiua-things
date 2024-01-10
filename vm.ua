@@ -173,52 +173,19 @@ ExecPrimitive ← (
 
 )
 
-# enum InstrRep {
-#     Comment(Ident),
-#     CallGlobal(usize, bool, Signature),
-#     BindGlobal(usize, usize),
-#     BeginArray,
-#     EndArray(bool, usize),
-#     Call(usize),
-#     PushFunc(Function),
-#     Switch(usize, Signature, usize),
-#     Format(EcoVec<EcoString>, usize),
-#     Dynamic(DynamicFunction),
-#     PushLocals(usize, usize),
-#     PopLocals,
-#     GetLocal(usize, usize),
-#     Unpack(usize, usize, bool),
-#     PushTempFunctions(usize),
-#     PopTempFunctions(usize),
-#     GetTempFunction(usize, Signature, usize),
-#     TouchStack(usize, usize),
-#     PushTemp(TempStack, usize, usize),
-#     PopTemp(TempStack, usize, usize),
-#     CopyToTemp(TempStack, usize, usize),
-#     CopyFromTemp(TempStack, usize, usize, usize),
-#     DropTemp(TempStack, usize, usize),
-#     PushSig(Signature),
-#     PopSig,
-#     SetOutputComment(usize, usize),
-#     #[serde(untagged)]
-#     Push(Value),
-#     #[serde(untagged)]
-#     Prim(Primitive, usize),
-#     #[serde(untagged)]
-#     ImplPrim(ImplPrimitive, usize),
-# }
-
-InstrTypePush ← 0
-InstrTypePrim ← 1
-InstrTypeOther ← 2
-
 NotImplemented ← |2.2 ⍤"not implemented"0 ⊙∘
 
+# { Ident }
 Comment ← NotImplemented
+# { usize, bool, Signature }
 CallGlobal ← NotImplemented
+# { usize, usize }
 BindGlobal ← NotImplemented
+# { }
 BeginArray ← NotImplemented
+# { bool, usize }
 EndArray ← NotImplemented
+# { usize }
 Call ← NotImplemented
 
 # { id  sig  slice } stack -- stack' newframe?
@@ -263,24 +230,46 @@ Switch ← (|2.2
 
 )
 
+# { EcoVec<EcoString>, usize }
 Format ← NotImplemented
+# { DynamicFunction }
 Dynamic ← NotImplemented
+# { usize, usize }
 PushLocals ← NotImplemented
+# {}
 PopLocals ← NotImplemented
+# { usize, usize }
 GetLocal ← NotImplemented
+# { usize, usize, bool }
 Unpack ← NotImplemented
+# { usize }
 PushTempFunctions ← NotImplemented
+# { usize }
 PopTempFunctions ← NotImplemented
+# { usize, Signature, usize }
 GetTempFunction ← NotImplemented
+# { usize, usize }
 TouchStack ← NotImplemented
+# { TempStack, usize, usize }
 PushTemp ← NotImplemented
+# { TempStack, usize, usize }
 PopTemp ← NotImplemented
+# { TempStack, usize, usize }
 CopyToTemp ← NotImplemented
+# { TempStack, usize, usize, usize }
 CopyFromTemp ← NotImplemented
+# { TempStack, usize, usize }
 DropTemp ← NotImplemented
+# { Signature }
 PushSig ← NotImplemented
+# { }
 PopSig ← NotImplemented
+# { usize, usize }
 SetOutputComment ← NotImplemented
+
+InstrTypePush ← 0
+InstrTypePrim ← 1
+InstrTypeOther ← 2
 
 InstrNames ← {
   "Comment"
@@ -501,6 +490,9 @@ Aeq ← ⍤⊃($"\nexpected\n_\ngot\n_")≍
 Check ← Aeq ⊙CompileAndRun
 
 ---
+Replace ← ⊐/⊂ ↘1 ♭≡⊂ {∘}: ⊢⇌⍉ regex ⊃(⊂"(.*?)"|⊂: ⊙⋅∘|⋅∘)
+⍤⊃⋅∘≍ "azzbzz" Replace "cc" "zz" "accbcc"
+
 Escape ← ↘¯1 ⊐/⊂ ↘1♭≡⊂ ⊃(□⊂@\\|⊕□⍜▽¯:\+.=, ⊙(⊂:@.))
 ⍤⊃⋅∘≍ "a\\b\\\"c" Escape @" "a\\b\"c"
 ⍤⊃⋅∘≍ "a\\\\b\"c" Escape @\\ "a\\b\"c"
@@ -508,11 +500,21 @@ Escape ← ↘¯1 ⊐/⊂ ↘1♭≡⊂ ⊃(□⊂@\\|⊕□⍜▽¯:\+.=, ⊙(�
 MakeCheckProgram ← (
   ⊃(
     ⍤"must run with absolute path for tests"=@/⊢. GetProgramPath
-  | ⊃(∘|$"\"_\"" Escape @" Escape @\\) Escape @\\
+  | ⊜□≠@\t.
+    ⊃(
+      (""|⊐/$"_\n_") ±⧻. ↘¯1
+    | °□⊢⇌
+    )
+  | $"\"_\"" Replace @\t "\\n" Escape @" Escape @\\ Escape @\\
   )
   $ # Experimental!
   $ Check ← &i "_" "Check"
-  $ Check {_} _
+  $ _
+  $ {
+  $ _
+  $ }
+  $ Check: _
+  # &p$"---\n_\n---" .
 
 )
 
@@ -657,6 +659,8 @@ RunTests ← &p⍜now(
     $ (*2|*4+)0 10 90 99
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
+
+    $ F=+123\tF 4
   }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
