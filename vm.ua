@@ -173,20 +173,20 @@ ExecPrimitive ← (
 
 )
 
-NotImplemented ← |2.2 ⍤"not implemented"0 ⊙∘
+NotImplemented ← |3.2 ⊙∘ ⍤⊙0 $"_ is not implemented"
 
-# { Ident }
-Comment ← NotImplemented
-# { usize, bool, Signature }
-CallGlobal ← NotImplemented
-# { usize, usize }
-BindGlobal ← NotImplemented
-# { }
-BeginArray ← NotImplemented
-# { bool, usize }
-EndArray ← NotImplemented
-# { usize }
-Call ← NotImplemented
+# {ident} stack -- stack' newframe?
+Comment ← NotImplemented "Comment"
+# {index call sig} stack -- stack' newframe?
+CallGlobal ← NotImplemented "CallGlobal"
+# {span index} stack -- stack' newframe?
+BindGlobal ← NotImplemented "BindGlobal"
+# { } stack -- stack' newframe?
+BeginArray ← NotImplemented "BeginArray"
+# {boxed span} stack -- stack' newframe?
+EndArray ← NotImplemented "EndArray"
+# {index} stack -- stack' newframe?
+Call ← NotImplemented "Call"
 
 # { id  sig  slice } stack -- stack' newframe?
 PushFunc ← (
@@ -230,42 +230,51 @@ Switch ← (|2.2
 
 )
 
-# { EcoVec<EcoString>, usize }
-Format ← NotImplemented
-# { DynamicFunction }
-Dynamic ← NotImplemented
-# { usize, usize }
-PushLocals ← NotImplemented
-# {}
-PopLocals ← NotImplemented
-# { usize, usize }
-GetLocal ← NotImplemented
-# { usize, usize, bool }
-Unpack ← NotImplemented
-# { usize }
-PushTempFunctions ← NotImplemented
-# { usize }
-PopTempFunctions ← NotImplemented
-# { usize, Signature, usize }
-GetTempFunction ← NotImplemented
-# { usize, usize }
-TouchStack ← NotImplemented
-# { TempStack, usize, usize }
-PushTemp ← NotImplemented
-# { TempStack, usize, usize }
-PopTemp ← NotImplemented
-# { TempStack, usize, usize }
-CopyToTemp ← NotImplemented
-# { TempStack, usize, usize, usize }
-CopyFromTemp ← NotImplemented
-# { TempStack, usize, usize }
-DropTemp ← NotImplemented
-# { Signature }
-PushSig ← NotImplemented
-# { }
-PopSig ← NotImplemented
-# { usize, usize }
-SetOutputComment ← NotImplemented
+# {parts span} stack -- stack' newframe?
+Format ← (|2.2
+  °□⊢                   # -- parts stack
+  ⊃(∘|≡⍜°□$"_" ⊃↙↘ -1⧻) # take (parts-1) values from stack, stringify them
+  ♭⍉⬚(□"")⊟             # alternate fragments and values
+  ⊐/⊂                   # join everything up
+  ⊂□                    # push resulting string
+  ⊙[]                   # no new frame
+
+)
+
+# {func} stack -- stack' newframe?
+Dynamic ← NotImplemented "Dynamic"
+# {count span} stack -- stack' newframe?
+PushLocals ← NotImplemented "PushLocals"
+# {} stack -- stack' newframe?
+PopLocals ← NotImplemented "PopLocals"
+# {index span} stack -- stack' newframe?
+GetLocal ← NotImplemented "GetLocal"
+# {count span unbox} stack -- stack' newframe?
+Unpack ← NotImplemented "Unpack"
+# {count} stack -- stack' newframe?
+PushTempFunctions ← NotImplemented "PushTempFunctions"
+# {count} stack -- stack' newframe?
+PopTempFunctions ← NotImplemented "PopTempFunctions"
+# {offset sig span} stack -- stack' newframe?
+GetTempFunction ← NotImplemented "GetTempFunction"
+# {count span} stack -- stack' newframe?
+TouchStack ← NotImplemented "TouchStack"
+# {stack count span} stack -- stack' newframe?
+PushTemp ← NotImplemented "PushTemp"
+# {stack count span} stack -- stack' newframe?
+PopTemp ← NotImplemented "PopTemp"
+# {stack count span} stack -- stack' newframe?
+CopyToTemp ← NotImplemented "CopyToTemp"
+# {stack offset count span} stack -- stack' newframe?
+CopyFromTemp ← NotImplemented "CopyFromTemp"
+# {stack count span} stack -- stack' newframe?
+DropTemp ← NotImplemented "DropTemp"
+# {sig} stack -- stack' newframe?
+PushSig ← NotImplemented "PushSig"
+# {} stack -- stack' newframe?
+PopSig ← NotImplemented "PopSig"
+# {i n} stack -- stack' newframe?
+SetOutputComment ← NotImplemented "SetOutputComment"
 
 InstrTypePush ← 0
 InstrTypePrim ← 1
@@ -661,6 +670,9 @@ RunTests ← &p⍜now(
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
 
     $ F=+123\tF 4
+
+    $ $"\_" 100
+    $ $"[x=\_ y=\_]" 100 200
   }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
