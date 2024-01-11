@@ -518,10 +518,11 @@ TransposeN ← (|2
   # -- runtime count
   ⍜RtStack(
     # -- stack count
-    ⊃(↘1|°□⊢)
-    # -- stack' array count
-    ⊙(⍥⍉:) # repeat transpose
-    ⊂□:    # push result
+    ⊃(⋅∘|°□⊢|↘1)
+    # -- count array stack'
+    (⍥⍉|⍥°⍉¯) <0. # repeat transpose
+    # -- result stack
+    ⊂□ # push result
 
   )
 )
@@ -1141,7 +1142,8 @@ RunTests ← &p⍜now(
     $ ⍥⊂3 [] 1 2 3
 
     # transpose_n
-    $ ⍉⍉1
+    $ ⍉⍉[1 2]
+    $ °(⍉⍉)[1 2]
 
     # group
     # $ ⊕∘ [0 2 2 1 0 1] [1 2 3 4 5 6]
