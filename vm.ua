@@ -66,7 +66,7 @@ Last ← (|1
 )
 
 MonadicOneOutputNames ← {
-  "identity" "trace"
+  "trace"
   "not" "sign" "neg" "abs" "sqrt" "sin" "floor" "ceil" "round"
   "len" "shape" "range" "first" "reverse" "deshape" "fix" "bits" "transpose" "rise" "fall"
   "where" "classify" "deduplicate" "box" "unbox" "parse"
@@ -78,8 +78,7 @@ MonadicOneOutputNames ← {
   "last" "last_max_index" "last_min_index"
   "sort_down" "sort_up"}
 MonadicOneOutputFns ← (
-  ∘
-| Trace
+  Trace
 | ¬
 | ±
 | ¯
@@ -220,6 +219,12 @@ TriadicOneOutputFns ← (
 )
 
 # runtime -- runtime'
+Identity ← (|1
+  ⍜RtArrayStack (-1) # touch stack
+
+)
+
+# runtime -- runtime'
 Repeat ← (|1
   ⍜RtStack ⊃(↘2|°{⊙∘}↙2) # get fn and repeat count from stack
   # -- runtime fn count
@@ -234,11 +239,12 @@ Repeat ← (|1
 )
 
 SpecialNames ← {
-  "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
+  "identity" "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
   "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
   "inv_dump" "inv_scan" "ungroup" "unpartition"}
 SpecialFns ← (
-  ToDo "reduce"
+  Identity
+| ToDo "reduce"
 | ToDo "fold"
 | ToDo "scan"
 | ToDo "each"
@@ -1074,6 +1080,7 @@ RunTests ← &p⍜now(
     $ {;1} 789
     $ [;1] 789
     $ {⊙∘} 1 2 3
+    $ [∘] 1
 
     # reduce
     # $ /+ [1 2 3 4 5]
