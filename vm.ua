@@ -323,7 +323,6 @@ BeginArray ← (|2
   # -- stacklen runtime
   ⍜⊙RtArrayStack ⊂
 )
-
 # boxed runtime -- runtime'
 EndArray ← (|2
   # pop current stack contents
@@ -513,6 +512,20 @@ PopSig ← ∘ToDo "PopSig"
 # {i n} runtime -- runtime'
 SetOutputComment ← ∘ToDo "SetOutputComment"
 
+# count runtime -- runtime'
+TransposeN ← (|2
+  :
+  # -- runtime count
+  ⍜RtStack(
+    # -- stack count
+    ⊃(↘1|°□⊢)
+    # -- stack' array count
+    ⊙(⍥⍉:) # repeat transpose
+    ⊂□:    # push result
+
+  )
+)
+
 InstrTypePush ← 0
 InstrTypePrim ← 1
 InstrTypeOther ← 2
@@ -543,7 +556,8 @@ InstrNames ← {
   "DropTemp"
   "PushSig"
   "PopSig"
-  "SetOutputComment"}
+  "SetOutputComment"
+  "transpose_n"}
 
 InstrFns ← (
   Comment
@@ -572,6 +586,7 @@ InstrFns ← (
 | PushSig
 | PopSig
 | SetOutputComment
+| TransposeN
 )
 
 InstrNamesToIds ← map ⊃(∘|⇡⧻) InstrNames
@@ -606,7 +621,7 @@ AnalyzeInstr ← (
             | # complex array
           ≡(ℂ°{:}°□)
             | # char array
-          ≡°□
+          ♭≡°□
             | # box array
           ∘
         )
@@ -615,7 +630,7 @@ AnalyzeInstr ← (
       ±⧻.
       (
         # scalar (used for char literals)
-        ⊢⊢ ;
+        ⊢ ;
         | # regular array: apply shape
         ↯
       )
@@ -623,66 +638,73 @@ AnalyzeInstr ← (
     | [] ⍤$"complex in JSON? _"⊙0
     | #  [ "prim", span ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
-    | # { "Instr": [ args… ] }
-      °[{⊙∘}] MapPairs
-      get: InstrNamesToIds
-      ⊃(⊙∘|∘)
+    |                     # { "Instr": [ args… ] }
+      =3⍣(type°□⊢°□⊢)⋅⋅0. # detect [ { "transpose_n": n } ]
       (
-        ⋅[] # Comment(ident)
+        °[{⊙∘}] MapPairs
+        get: InstrNamesToIds
+        ⊃(⊙∘|∘)
+        (
+          ⋅[] # Comment(ident)
 
-        | ∘ # CallGlobal
+            | ∘ # CallGlobal
 
-        | ∘ # BindGlobal
+            | ∘ # BindGlobal
 
-        | ⋅[] # BeginArray
+            | ⋅[] # BeginArray
 
-        | °□⊢ # EndArray(boxed, span)
+            | °□⊢ # EndArray(boxed, span)
 
-        | ⋅[] # Call(span)
+            | ⋅[] # Call(span)
 
-        | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
+            | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
 
-        | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
+            | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
 
-        | °□⊢ # Format(parts, span)
+            | °□⊢ # Format(parts, span)
 
-        | ∘ # Dynamic
+            | ∘ # Dynamic
 
-        | ∘ # PushLocals
+            | ∘ # PushLocals
 
-        | ∘ # PopLocals
+            | ∘ # PopLocals
 
-        | ∘ # GetLocal
+            | ∘ # GetLocal
 
-        | ∘ # Unpack
+            | ∘ # Unpack
 
-        | ∘ # PushTempFunctions
+            | ∘ # PushTempFunctions
 
-        | ∘ # PopTempFunctions
+            | ∘ # PopTempFunctions
 
-        | ∘ # GetTempFunction
+            | ∘ # GetTempFunction
 
-        | °□⊢ # TouchStack(count, span)
+            | °□⊢ # TouchStack(count, span)
 
-        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
+            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
 
-        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
+            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
 
-        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
+            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
 
-        | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
+            | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
 
-        | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
+            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
 
-        | ∘ # PushSig
+            | ∘ # PushSig
 
-        | ∘ # PopSig
+            | ∘ # PopSig
 
-        | ∘ # SetOutputComment
+            | ∘ # SetOutputComment
 
+        )
+        :
+        {InstrTypeOther {⊙∘}}
+        | # other
+        °{⊙∘}⊢MapPairs°□⊢
+        get: InstrNamesToIds
+        {InstrTypeOther {⊙∘}}
       )
-      :
-      {InstrTypeOther {⊙∘}}
     )
   )
 )
@@ -907,6 +929,7 @@ RunTests ← &p⍜now(
     $ [[4 5 6][7 8 9]]
     $ ["x" "y"]
     $ {"x" "yz"}
+    $ i
 
     # stack operations
     $ .2
@@ -1116,6 +1139,9 @@ RunTests ← &p⍜now(
     $ ⍥(+2)0 99 200
     $ ⍥(⊂2)5 []
     $ ⍥⊂3 [] 1 2 3
+
+    # transpose_n
+    $ ⍉⍉1
 
     # group
     # $ ⊕∘ [0 2 2 1 0 1] [1 2 3 4 5 6]
