@@ -256,19 +256,25 @@ BeginArray ← NotImplemented "BeginArray"
 # {boxed span} runtime -- runtime'
 EndArray ← NotImplemented "EndArray"
 
-# {index} runtime -- runtime'
-Call ← NotImplemented "Call"
-
 # fn on stack = [ sig slice ]
+
+# [] runtime -- runtime'
+Call ← (|2
+  ⋅⍜RtStack (
+    # -- stack index
+    ⊃(↘1|⊡1°□⊢)
+    # -- stack'
+
+  )
+  # -- runtime fnslice
+  ⍜RtCallStack(⊂ MakeFrame :) # push new frame onto callstack
+
+)
 
 # [ sig slice ] runtime -- runtime'
 PushFunc ← (
-  :
-  ⍜RtStack(
-    :
-    ⊂□ # push fn
+  ⍜⊙RtStack(⊂□) # push fn
 
-  )
 )
 
 # {fncount sig} runtime -- runtime'
@@ -313,9 +319,7 @@ Switch ← (|2
 
 # parts runtime -- runtime'
 Format ← (|2
-  :
-  ⍜RtStack (
-    :
+  ⍜⊙RtStack (
     # -- parts stack
     ⊃(∘|≡⍜°□$"_" ⊃↙↘ -1⧻) # take (parts-1) values from stack, stringify them
     ♭⍉⬚(□"")⊟             # alternate fragments and values
@@ -359,83 +363,50 @@ TouchStack ← (|2
 PushTemp ← (|2
   °⊟
   # -- stackid count runtime
-  ⊃(⋅⋅∘|⋅∘|∘)
-  # -- runtime count stackid
-  # take from stack
-  ⍜RtStack (⊃↘↙ :)
-  # -- runtime' values stackid
-  ⊃(∘|⋅⋅∘|⋅∘)
-  # -- runtime stackid values
-  ⍜(RtTempStacks) (
-    # -- tempstacks stackid values
-    :
-    ⍜(°□⊡) (
-      ⊂⇌:
-    )
-  )
+  ⊙⍜⊙RtStack ⊃↙↘ # take from stack
+  # -- stackid values runtime'
+  ⊙:
+  # -- stackid runtime values
+  ⍜(°□⊡⊙RtTempStacks) (⊂⇌:)
 )
 
 # [stackid count] runtime -- runtime'
 PopTemp ← (|2
-  °⊟
-  # -- stackid count runtime
-  ⊃(⋅⋅∘|∘|⋅∘)
-  # -- runtime stackid count
-  ⍜(RtTempStacks) (
-    # -- tempstacks stackid count
-    :
-    ⍜(°□⊡) (
-      ⊃↘↙ :
-    )
-  )
+  : °⊟
+  # -- count stackid runtime
+  ⍜(⊙(°□⊡) ⊙⊙RtTempStacks) ⊃↙↘
   # -- runtime values
-  # push to stack
-  ⍜RtStack (⊂⇌:)
+  ⍜⊙RtStack (⊂⇌) # push to stack
+
 )
 
 # [stackid count] runtime -- runtime'
 CopyToTemp ← (|2
   °⊟
   # -- stackid count runtime
-  ⊃(⋅⋅∘|⋅∘|∘)
-  # -- runtime count stackid
   # copy from stack
-  ⊃∘(↙: RtStack)
-  # -- runtime values stackid
-  ⊃(∘|⋅⋅∘|⋅∘)
-  # -- runtime stackid values
-  ⍜(RtTempStacks) (
-    # -- tempstacks stackid values
-    :
-    ⍜(°□⊡) (
-      ⊂⇌:
-    )
-  )
+  ⊃⋅(↙ ⊙RtStack) ⊙⋅∘
+  # -- values stackid runtime
+  ⍜⊙⊙RtTempStacks ⍜⊙(°□⊡) (⊂⇌)
 )
 
 # [stackid offset count] runtime -- runtime'
 CopyFromTemp ← (|2
   °[⊙⊙∘]
   # -- stackid offset count runtime
-  ⊃(⋅⋅⋅∘|∘|⋅∘|⋅⋅∘)
-  # -- runtime stackid offset count
-  ⊃∘(↙: ↘: °□⊡: RtTempStacks)
-  # -- runtime values
-  # push to stack
-  ⍜RtStack (⊂⇌:)
+  ⊃(⋅:|°□⊡ ⊙(RtTempStacks ⋅⋅∘)|⋅⋅⋅∘)
+  # -- count offset tempstack runtime
+  ↙ ⊙↘
+  # -- values runtime
+  ⍜⊙RtStack (⊂⇌) # push to stack
+
 )
 
 # [stackid count] runtime -- runtime'
 DropTemp ← (|2
-  °⊟
-  # -- stackid count runtime
-  ⊃(⋅⋅∘|∘|⋅∘)
-  # -- runtime stackid count
-  ⍜(RtTempStacks) (
-    # -- tempstacks stackid count
-    :
-    ⍜(°□⊡) (↘:)
-  )
+  :°⊟
+  # -- count stackid runtime
+  ⍜⊙⊙RtTempStacks ⍜⊙(°□⊡) ↘
 )
 
 # {sig} runtime -- runtime'
@@ -519,7 +490,8 @@ AnalyzeInstr ← (
     {InstrTypePush ∘} # number literal
 
   | [] ⍤$"complex in JSON? _"⊙0
-  | {InstrTypePush ∘} # string literal
+  |                   # TODO: special case BeginArray, PopLocals, PopSig
+    {InstrTypePush ∘} # string literal
 
   | type°□⊢.
     (
@@ -550,7 +522,7 @@ AnalyzeInstr ← (
       )
       {InstrTypePush ∘}
     | [] ⍤$"complex in JSON? _"⊙0
-    | #  [ "prim", … ]
+    | #  [ "prim", span ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
     | # { "Instr": [ args… ] }
       °[{⊙∘}] MapPairs
@@ -567,13 +539,13 @@ AnalyzeInstr ← (
 
         | ∘ # EndArray
 
-        | ∘ # Call
+        | ⋅[] # Call(span)
 
         | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
 
-        | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch
+        | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
 
-        | °□⊢ # Format
+        | °□⊢ # Format(parts, span)
 
         | ∘ # Dynamic
 
@@ -591,7 +563,7 @@ AnalyzeInstr ← (
 
         | ∘ # GetTempFunction
 
-        | °□⊢ # TouchStack
+        | °□⊢ # TouchStack(count, span)
 
         | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
 
@@ -640,8 +612,8 @@ ExecInstr ← (|2
       ExecPrimitive
     )
   | # other
-    # -- jsoninstr runtime
-    °{⊙∘} # -- jsoninstrid jsoninstr runtime
+    # -- instr runtime
+    °{⊙∘} # -- instrid instrargs runtime
     InstrFns
   )
 )
@@ -808,6 +780,7 @@ Parallel! ← (
 
 RunTests ← &p⍜now(
   {
+    # literals
     $ 123
     $ "hello"
     $ @x
@@ -819,12 +792,14 @@ RunTests ← &p⍜now(
     $ ["x" "y"]
     $ {"x" "yz"}
 
+    # stack operations
     $ .2
     $ ,1 2
     $ :1 2
     $ ;1 2 3
 
-    $ ∘3
+    # monadic pervasive
+    $ ∘ 3
     $ ¬ 3
     $ ± 3
     $ ¯ 1
@@ -835,6 +810,7 @@ RunTests ← &p⍜now(
     $ ⌈ 1.234
     $ ⁅ 5.678
 
+    # dyadic pervasive
     $ =1 2
     $ ≠1 2
     $ <1 2
@@ -853,6 +829,7 @@ RunTests ← &p⍜now(
     $ ∠1 0
     $ ℂ1 2
 
+    # monadic array
     $ ⧻5
     $ △5
     $ ⇡5
@@ -870,6 +847,7 @@ RunTests ← &p⍜now(
     $ ⊔□5
     $ ⋕ "17"
 
+    # dyadic array
     $ ≍ [0 1 2] [0 1 2]
     $ ⊟ 1 2
     $ ⊂ 1 2
@@ -886,6 +864,7 @@ RunTests ← &p⍜now(
     $ ∊ 2 [1 2 3]
     $ ⊗ 2 [1 2 3]
 
+    # misc
     $ ⍤"ok" 1
     $ gen0
     $ deal0 [1 2 3 4 5]
@@ -894,20 +873,22 @@ RunTests ← &p⍜now(
     $ ≥0 tag
     $ type 5
     $ ±now
+    $ - . ⚂
 
+    # constants
     $ η
     $ π
     $ τ
     $ ∞
 
+    # maps
     $ map 1\_2 3\_4
     $ insert 1 2 {}
     $ has 1 map 1\_2 3\_4
     $ get 1 1\_2 3\_4
     $ remove 3 map 1\_2 3\_4
 
-    $ - . ⚂
-
+    # System
     $ &sc
     $ &cd "/tmp"
     $ &fras "/tmp/data1.tmp" &fwa "/tmp/data1.tmp" "data"
@@ -915,6 +896,7 @@ RunTests ← &p⍜now(
     $ &ims [[1 0][0 1]]
     $ type &args
 
+    # Switch
     $ (10|20)0
     $ (10 20|20 30)1
     $ (*2|*4+)1 10 90
@@ -923,11 +905,11 @@ RunTests ← &p⍜now(
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)0 10 20 30 40
     $ (|4.3 1 2 3 ⋅⋅⋅;||3.2 5 6 ⋅⋅;)1 10 20 30 40
 
-    $ F ← +123\tF 4
-
+    # Format
     $ $"\_" 100
     $ $"[x=\_ y=\_]" 100 200
 
+    # PushTemp, PopTemp
     $ ⊙100 200
     $ ⊙⊙∘ 100 200 300
     $ ⊙⋅⋅⊙100 200 300 400 500
@@ -936,9 +918,149 @@ RunTests ← &p⍜now(
     $ ⊃(×2+|+1) 100 200 300
     $ ⊃(×2|⊙∘) 10 100 1000
 
+    # CopyToTemp, CopyFromTemp, DropTemp
     $ ⍜(×10) ⁅ 1.234
     $ ⍜⊢(×2) [1 2 3]
     $ ⊢⇌[1 2 3]
+
+    # Call
+    $ F ← ⍤.1\tF
+
+    # reduce
+    # $ /+ [1 2 3 4 5]
+    # $ /- [1 2 3 4 5]
+    # $ /- [1 2 3 4 5]
+    # $ \- [1 2 3 4 5]
+    # $ /(×+1) [1 2 3 4 5]
+    # $ /⊂ .↯[2 2 4]⇡16
+    # $ /+ []
+    # $ /× []
+    # $ /↥ []
+    # $ /↧ []
+    # $ /∠ []
+
+    # fold
+    # $ ∧+ [1 2 3] 10
+    # $ ∧+ [] 10
+    # $ ∧(⊃+(×⊙⋅∘)) +1⇡5 0 1
+    # $ ∧(⊃+(×⊙⋅∘))⊙(0 1) +1⇡5
+    # $ ∧⊃(+⊙⋅∘)(×⋅⊙⋅∘) [1 2 3] [4 5 6] 0 1
+    # $ ∧(⊂⊂) [1 2 3] 4 []
+    # $ ⇌∧(⊂+⊙(⊢.)) ⊃↘↙1 [1 2 3 4]
+
+    # scan
+    # $ \+   [1 2 3 4]
+    # $ \-   [1 2 3 4]
+    # $ \(-:) [1 2 3 4]
+    # $ ▽\↧≠@ . "Hello World!"
+    # $ ⊕□\+=@    . "Everyday man's on the block"
+    # $ ⊕□\+↻¯1=@ . "Everyday man's on the block"
+
+    # each
+    # $ ∵(⊟.) [1 2 3 4]
+    # $ ∵⊂ [1 2 3] [4 5 6]
+    # $ ∵⊂ [1 2] [[4 5] [6 7]]
+    # $  + [1 2 3] [4 5 6]
+
+    # rows
+    # $  /+ [[1 2 3] [4 5 6] [7 8 9]]
+    # $ ≡/+ [[1 2 3] [4 5 6] [7 8 9]]
+    # $ ≡/+ [[1 2] [3 4]] [5 6]
+    # $ ≡⊂  [[1 2] [3 4]] [5 6]
+    # $ ≡⊂ [1 2 3] 4
+    # $ ≡⊂ 1 [2 3 4]
+    # $ ≡(⊂⊂) 1 [2 3 4] 5
+    # $ ≡⊂ ¤  [1 2 3] [4 5 6]
+    # $ ≡⊂ ⊙¤ [1 2 3] [4 5 6]
+
+    # table
+    # $ ⊞+ [1 2 3] [4 5 6 7]
+    # $ ⊞⊂ [1 2] [3 4]
+    # $ △⊞+ [1 2] [3 4 5]
+    # $ △⊞⊂ [1 2] [3 4 5]
+    # $ △⊞+ [[1 2 3] [4 5 6]] [7 8 9 10]
+    # $ △⊞⊂ [[1 2 3] [4 5 6]] [7 8 9 10]
+
+    # cross
+    # $ ⊠⊂ ,,[[7 8] [9 10]][[1 2] [3 4] [5 6]]
+    # $ ⊠(⊂⊂) [1 2] [3 4] [5 6]
+    # $ /⊂ ⊠(⊂⊂) ⊙¤ [1 2] [3 4] [5 6]
+
+    # repeat
+    # $ ⍥(+2)5 0
+    # $ ⍥(⊂2)5 []
+    # $ ⍥⊂3 [] 1 2 3
+
+    # group
+    # $ ⊕∘ [0 2 2 1 0 1] [1 2 3 4 5 6]
+    # $ ⊕⊂ [] [0 2 2 1 0 1] [1 2 3 4 5 6]
+    # $ ⊕□ [0 1 0 2 1 1] [1 2 3 4 5 6]
+    # $ ⊕{⊢:⧻.} ⊛.⊏⍏. $ Count the characters is this string
+    # $ ⍜⊕□≡⇌ ≠@ . $ These are some words
+
+    # partition
+    # $ ⊜∘ [0 0 2 2 1 1 3 3] [1 2 3 4 5 6 7 8]
+    # $ ⊜⊂ [] [0 0 2 2 1 1 3 3] [1 2 3 4 5 6 7 8]
+    # $ ⊜□ [0 2 3 3 3 0 1 1] [1 2 3 4 5 6 7 8]
+    # $ ⊜□ ≠@ . $ Hey there friendo
+    # $ ⍜⊜□⇌ ≠@ . $ These are some words
+
+    # unpack
+    # $ ⊐/⊂ {"a" "bc" "def"}
+    # $ ⊐(¯□3)
+    # $ ⊐( □3)
+
+    # do
+    # $ ⍢(×2)(<1000) 1
+    # $ ⍢⊂(¬∊,,(+1×3|÷2)=0◿2.⊢.) [7]
+    # $ ⍢(×3)(<100)  1
+    # $ ⍢(×3)(<100.) 1
+    # $ ⍢(⊃(×2)⊂)(<100) 1 []
+
+    # fill
+    # $ ⬚0↙ 7 [8 3 9 2 1]
+    # $ ⬚π↙ ¯6 [1 2 3]
+    # $ ⬚42↙ 4 [[1 2 3] [4 5 6]]
+    # $ ⬚0⊟ 1 [2 3]
+    # $ ⬚0⊟ [1 2] [3 4 5 6]
+    # $ ⬚0⊟ [1 2 3] [[4 5] [6 7]]
+    # $ ⬚0⊂ 1 [[2 3 4] [5 6 7]]
+    # $ ⬚0⊂ [[1 2] [3 4]] [5 6 7]
+    # $ ⬚0[1 [2 3] [4 5 6]]
+    # $ ⬚0+ [1 2 3] [10 9 8 7 6 5]
+    # $ ⬚0\⊂ [1 2 3 4 5]
+    # $ ⬚@ ⊜∘≠@ . "No □ needed!"
+    # $ ⬚∞⊏ [3 7 0] [8 3 9 2 0]
+    # $ ⬚0▽ ≡/>◫2. [1 8 0 2 7 2 3]
+    # $ ⬚0↯ [3 5] ⇡9
+    # $ ⬚0↻ 2 [1 2 3 4 5]
+    # $ ⬚∘+ 100 [1 2 3 4] [5 6]
+    # $ ⬚0(↻1 ⇡5 ⬚[]↻3 ⇡5 ↻2 ⇡5)
+
+    # try
+    # $ ⍣(+1 2)$"Error:  "
+    # $ ⍣(+@a @b)$"Error:  "
+
+    # this
+    # recur
+    # $ ↬((|1 ×↫-1.|1)<2.) 5
+
+    # bind
+    # $ bind(⊂ b + a c) 1 2 3
+
+    # memo
+    # $ ∵memo(+⌊×10⚂)[1 1 2 2 3 3]
+
+    # spawn
+    # wait
+    # $ wait spawn⇡ 10
+
+    # send
+    # recv
+    # tryrecv
+
+    # dump
+    # $ dump⊢ [1 2 3] 4 [5 6 7]
   }
 
   ⊐/⊂ ≡(⍜°□(⊜□ ≠@\n.))
