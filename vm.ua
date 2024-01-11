@@ -6,9 +6,6 @@ ExpandSlice ← +⊙⇡ °⊟
 
 Log ← &p
 
-# map -- keys
-MapKeys ← ▽ ≡(¬≍NaN °□). °□⊢
-
 # map -- pairs
 MapPairs ← ⍉⊟°map
 
@@ -24,18 +21,30 @@ RtStack ← °□⊡1
 RtTempStacks ← °□⊡2
 RtArrayStack ← °□⊡3
 
+FrameTypePlain ← 0
+FrameTypeRepeat ← 1
+
+# frame = { frametype ({ pc addrs } | { counter count fn }) }
+
 # slice -- frame
-MakeFrame ← (|1
+MakePlainFrame ← (|1
   ExpandSlice
   0 # pc
   {⊙∘}
+  {FrameTypePlain ∘}
 )
 
-# TODO inverse modifiers:
-# (0[1], inv_dump),
-# (1[1], inv_scan),
-# (3[1], ungroup),
-# (3[1], unpartition),
+# count [fnsig fnslice] -- frame
+MakeRepeatFrame ← (|2
+  ⊙(⊢⇌) # keep only fnslice
+  0     # pc
+  {⊙⊙∘}
+  {FrameTypeRepeat ∘}
+)
+
+FrameType ← °□⊡0
+
+ToDo ← ⍤⊙0 $"_ is not implemented"
 
 Trace ← ⊃∘(&p$"┌╴⸮\n_\n└╴╴╴╴"$"├╴_")
 
@@ -101,32 +110,34 @@ MonadicOneOutputFns ← (
 | type
 | &frab
 | &fras
-| ⍤"acos"0∘
-| ⍤"asin"0∘
-| ⍤"cos"0∘
-| ⍤"first_max_index"0∘
-| ⍤"first_min_index"0∘
-| ⍤"first_where"0∘
-| ⍤"inv_fix"0∘
-| ⍤"inv_parse"0∘
-| ⍤"inv_trace"0∘
-| ⍤"inv_utf"0∘
-| ⍤"inv_where"0∘
-| ⍤"inverse_bits"0∘
+| ∘ ToDo "acos"
+| ∘ ToDo "asin"
+| ∘ ToDo "cos"
+| ∘ ToDo "first_max_index"
+| ∘ ToDo "first_min_index"
+| ∘ ToDo "first_where"
+| ∘ ToDo "inv_fix"
+| ∘ ToDo "inv_parse"
+| ∘ ToDo "inv_trace"
+| ∘ ToDo "inv_utf"
+| ∘ ToDo "inv_where"
+| ∘ ToDo "inverse_bits"
 | Last
-| ⍤"last_max_index"0∘
-| ⍤"last_min_index"0∘
-| ⍤"sort_down"0∘
-| ⍤"sort_up"0∘
+| ∘ ToDo "last_max_index"
+| ∘ ToDo "last_min_index"
+| ∘ ToDo "sort_down"
+| ∘ ToDo "sort_up"
 )
 
-MonadicTwoOutputNames ← {
-  "dup" "gen"
-  "inv_atan"
-  "inv_complex"
-  "inv_couple"
-  "inv_map"}
-MonadicTwoOutputFns ← (.|gen|⍤"inv_atan"0.|⍤"inv_complex"0.|⍤"inv_couple"0.|⍤"inv_map"0.)
+MonadicTwoOutputNames ← {"dup" "gen" "inv_atan" "inv_complex" "inv_couple" "inv_map"}
+MonadicTwoOutputFns ← (
+  .
+| gen
+| . ToDo "inv_atan"
+| . ToDo "inv_complex"
+| . ToDo "inv_couple"
+| . ToDo "inv_map"
+)
 
 DyadicNoOutputNames ← {"assert" "f_write_all"}
 DyadicNoOutputFns ← (⍤|&fwa)
@@ -180,8 +191,8 @@ DyadicOneOutputFns ← (
 | remove
 | regex
 | Unfirst
-| ⍤"unlast"0⋅∘
-| ⍤"unreshape"0⋅∘
+| ⋅∘ ToDo "unlast"
+| ⋅∘ ToDo "unreshape"
 )
 
 DyadicTwoOutputNames ← {"flip"}
@@ -200,12 +211,61 @@ TriadicNoOutputNames ← {
   "untake"}
 TriadicOneOutputFns ← (
   insert
-| ⍤"undrop"0⋅⋅∘
-| ⍤"unkeep"0⋅⋅∘
-| ⍤"unpick"0⋅⋅∘
-| ⍤"unrerank"0⋅⋅∘
-| ⍤"unselect"0⋅⋅∘
-| ⍤"untake"0⋅⋅∘
+| ⋅⋅∘ ToDo "undrop"
+| ⋅⋅∘ ToDo "unkeep"
+| ⋅⋅∘ ToDo "unpick"
+| ⋅⋅∘ ToDo "unrerank"
+| ⋅⋅∘ ToDo "unselect"
+| ⋅⋅∘ ToDo "untake"
+)
+
+# runtime -- runtime'
+Repeat ← (|1
+  ⍜RtStack ⊃(↘2|°{⊙∘}↙2) # get fn and repeat count from stack
+  # -- runtime fn count
+  ⊃(±⋅⋅∘|⊙⊙∘)
+  (
+    # special case 0 count: do nothing
+    ⊙⋅;
+  | ⊙(MakeRepeatFrame :)
+    # -- runtime newframe
+    ⍜RtCallStack (⊂:)
+  )
+)
+
+SpecialNames ← {
+  "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
+  "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
+  "inv_dump" "inv_scan" "ungroup" "unpartition"}
+SpecialFns ← (
+  ToDo "reduce"
+| ToDo "fold"
+| ToDo "scan"
+| ToDo "each"
+| ToDo "rows"
+| ToDo "table"
+| ToDo "cross"
+| Repeat
+| ToDo "group"
+| ToDo "partition"
+| ToDo "unpack"
+| ToDo "do"
+| ToDo "fill"
+| ToDo "try"
+| ToDo "this"
+| ToDo "recur"
+| ToDo "bind"
+| ToDo "memo"
+| ToDo "spawn"
+| ToDo "wait"
+| ToDo "send"
+| ToDo "recv"
+| ToDo "tryrecv"
+| ToDo "dump"
+| ToDo "inv_dump"
+| ToDo "inv_scan"
+| ToDo "ungroup"
+| ToDo "unpartition"
 )
 
 PrimNameLists ← {
@@ -218,39 +278,40 @@ PrimNameLists ← {
   DyadicOneOutputNames
   DyadicTwoOutputNames
   DyadicThreeOutputNames
-  TriadicNoOutputNames}
+  TriadicNoOutputNames
+  SpecialNames}
 
 PrimIds ← ≡(□≡⊂⊙°□) ⊃(⇡⧻|≡(□⇡⧻)) PrimNameLists
 
 PrimNamesToIds ← map ∩⊐/⊂ PrimNameLists PrimIds
 
-# primid stack -- stack'
+# primid runtime -- runtime'
 ExecPrimitive ← (
   °⊟
+  # -- primtype primsubid
   (
-    NoadicNoOutputFns
-  | ⊂□ NoadicOneOutputFns
-  | MonadicNoOutputFns ⊙⊃(°□⊢|↘1)
-  | ⊂□ MonadicOneOutputFns ⊙⊃(°□⊢|↘1)
-  | ⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢|↘1)
-  | DyadicNoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
-  | ⊂□ DyadicOneOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
-  | ⊂{⊙∘} DyadicTwoOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
-  | ⊂{⊙⊙∘} DyadicThreeOutputFns ⊙⊃(°{⊙∘}↙2|↘2)
-  | ⊂□ TriadicOneOutputFns ⊙⊃(°{⊙⊙∘}↙3|↘3)
+    ⍜⊙RtStack(NoadicNoOutputFns)
+  | ⍜⊙RtStack(⊂□ NoadicOneOutputFns)
+  | ⍜⊙RtStack(MonadicNoOutputFns ⊙⊃(°□⊢|↘1))
+  | ⍜⊙RtStack(⊂□ MonadicOneOutputFns ⊙⊃(°□⊢|↘1))
+  | ⍜⊙RtStack(⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢|↘1))
+  | ⍜⊙RtStack(DyadicNoOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
+  | ⍜⊙RtStack(⊂□ DyadicOneOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
+  | ⍜⊙RtStack(⊂{⊙∘} DyadicTwoOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
+  | ⍜⊙RtStack(⊂{⊙⊙∘} DyadicThreeOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
+  | ⍜⊙RtStack(⊂□ TriadicOneOutputFns ⊙⊃(°{⊙⊙∘}↙3|↘3))
+  | SpecialFns
   )
 )
 
-NotImplemented ← |2 ∘ ⍤⊙0 $"_ is not implemented"
-
 # {ident} runtime -- runtime'
-Comment ← NotImplemented "Comment"
+Comment ← ∘ToDo "Comment"
 
 # {index call sig} runtime -- runtime'
-CallGlobal ← NotImplemented "CallGlobal"
+CallGlobal ← ∘ToDo "CallGlobal"
 
 # {span index} runtime -- runtime'
-BindGlobal ← NotImplemented "BindGlobal"
+BindGlobal ← ∘ToDo "BindGlobal"
 
 # [] runtime -- runtime'
 BeginArray ← (|2
@@ -306,7 +367,7 @@ Call ← (|2
 
   )
   # -- runtime fnslice
-  ⍜RtCallStack(⊂ MakeFrame :) # push new frame onto callstack
+  ⍜RtCallStack(⊂ MakePlainFrame :) # push new frame onto callstack
 
 )
 
@@ -318,41 +379,34 @@ PushFunc ← (
 
 # {fncount sig} runtime -- runtime'
 Switch ← (|2
-  :
-  ⍜RtStack (
-    :
+  ⍜⊙RtStack (
+    # -- {fncount sig} stack
     °{⊙∘} # get fncount, sig
     # -- fncount sig stack
     ⊃(
-      °□⊡ ⊙⋅∘ # selector: after fns
-
-    | ⇌↙ ⊙⋅∘ # fns, reversed
+      -:-1 ⊃(∘|°□⊡ ⊙⋅∘|⋅⋅∘) # pick selector after fns, compute selected pos
+      °□⊡                   # pick selected fn # TODO: array selectors
 
     | ⋅∘ # keep sig
 
     | ↘ +1 ⊙⋅∘ # drop fns and selector from stack
 
     )
-    # -- selector fns sig stack'
-    °□⊡ # pick selected fn # TODO: array selectors
     # -- fn sig stack
-    °⊟ # extract fnsig and fnslice
-
-    # -- fnsig fnslice sig stack
-    ⊃(
-      ⊙; # drop fnslice
-      # compute args to discard
+    :°⊟ # extract fnsig and fnslice
+    # -- fnslice fnsig sig stack
+    ⊓(
+      MakePlainFrame
+    |                 # compute args to discard
       ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # sig.args stack ((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
       ⍜↙(↘ ¯:)        # discard extra args
 
-    | ⋅∘ # keep fnslice
-
     )
-    # -- stack fnslice
+    # -- newframe stack'
 
   )
-  # -- runtime fnslice
-  ⍜RtCallStack(⊂ MakeFrame :) # push new frame onto callstack
+  # -- newframe runtime
+  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
 
 )
 
@@ -369,28 +423,28 @@ Format ← (|2
 )
 
 # {func} runtime -- runtime'
-Dynamic ← NotImplemented "Dynamic"
+Dynamic ← ∘ToDo "Dynamic"
 
 # {count span} runtime -- runtime'
-PushLocals ← NotImplemented "PushLocals"
+PushLocals ← ∘ToDo "PushLocals"
 
 # {} runtime -- runtime'
-PopLocals ← NotImplemented "PopLocals"
+PopLocals ← ∘ToDo "PopLocals"
 
 # {index span} runtime -- runtime'
-GetLocal ← NotImplemented "GetLocal"
+GetLocal ← ∘ToDo "GetLocal"
 
 # {count span unbox} runtime -- runtime'
-Unpack ← NotImplemented "Unpack"
+Unpack ← ∘ToDo "Unpack"
 
 # {count} runtime -- runtime'
-PushTempFunctions ← NotImplemented "PushTempFunctions"
+PushTempFunctions ← ∘ToDo "PushTempFunctions"
 
 # {count} runtime -- runtime'
-PopTempFunctions ← NotImplemented "PopTempFunctions"
+PopTempFunctions ← ∘ToDo "PopTempFunctions"
 
 # {offset sig span} runtime -- runtime'
-GetTempFunction ← NotImplemented "GetTempFunction"
+GetTempFunction ← ∘ToDo "GetTempFunction"
 
 # count runtime -- runtime'
 TouchStack ← (|2
@@ -451,13 +505,13 @@ DropTemp ← (|2
 )
 
 # {sig} runtime -- runtime'
-PushSig ← NotImplemented "PushSig"
+PushSig ← ∘ToDo "PushSig"
 
 # {} runtime -- runtime'
-PopSig ← NotImplemented "PopSig"
+PopSig ← ∘ToDo "PopSig"
 
 # {i n} runtime -- runtime'
-SetOutputComment ← NotImplemented "SetOutputComment"
+SetOutputComment ← ∘ToDo "SetOutputComment"
 
 InstrTypePush ← 0
 InstrTypePrim ← 1
@@ -641,21 +695,13 @@ ExecInstr ← (|2
   (
     # push
     # -- value runtime
-    :
-    # -- runtime value
-    ⍜RtStack(
-      :
+    ⍜⊙RtStack(
       ⊂□ # push onto stack
 
     )
   | # prim
     # -- primid runtime
-    :
-    # -- runtime primid
-    ⍜RtStack(
-      :
-      ExecPrimitive
-    )
+    ExecPrimitive
   | # other
     # -- instr runtime
     °{⊙∘} # -- instrid instrargs runtime
@@ -663,29 +709,42 @@ ExecInstr ← (|2
   )
 )
 
-# frame = { pc addrs }
-FramePc ← ⊢
+# { frametype { pc addrs } } -- bool
+PlainFrameDone ← ≤ ⊙⧻ °{⊙∘} °□⊢⇌
 
-# frame -- bool
-FrameDone ← ≤ ⊙⧻ °{⊙∘}
+# { frametype { pc addrs } } instrs -- instr
+PlainFrameGetInstr ← °□⊡⊡ °{⊙∘} °□⊢⇌
 
-# frame instrs -- instr
-FrameGetInstr ← °□⊡⊡ °{⊙∘}
+# { frametype { pc addrs } } -- pc
+PlainFramePc ← °□⊢°□⊢⇌
+
+# { frametype { counter count fn } } -- counter
+RepeatFrameCounter ← °□⊢°□⊢⇌
+
+# { frametype { counter count fn } } -- bool
+RepeatFrameDone ← /≤ ↙2 °□⊢⇌
+
+# { frametype { counter count fn } } -- fn
+RepeatFrameFn ← °□⊡2 °□⊢⇌
 
 # runtime instrs -- runtime'
 Advance ← (|2
   # -- runtime instrs
-  ⊃(FrameDone ⊢RtCallStack|∘)
-  # reached end of top frame?
+  FrameType ⊢RtCallStack. # switch on top frame type
   (
-    |2 # no, go on
-    # -- runtime instrs
+    # plain frame
     ⍜(⊢RtCallStack)(|2.2
       # -- topframe instrs
       ⊃(
-        ⍜FramePc (+1) # bump pc
+        ⍜PlainFramePc (+1) # bump pc
+        PlainFrameDone.    # done?
+        (
+          # no: keep frame
 
-        | FrameGetInstr # fetch next instr
+            | ⋅[] # yes: destroy frame
+
+        )
+        | PlainFrameGetInstr # fetch next instr
 
       )
     )
@@ -693,32 +752,47 @@ Advance ← (|2
     ExecInstr
     # -- runtime
 
-  | |1 # yes: destroy it, keep stack
-    # -- runtime
-    ⍜RtCallStack (↘1)
-  )
-)
+  | # repeat frame
 
-# callstack -- bool
-CallStackActive ← (
-  (¬FrameDone °[∘]|1) >1⧻.
+    ⍜(⊢RtCallStack)(|1.2
+      # -- topframe
+      ⊃(
+        ⍜RepeatFrameCounter (+1) # bump counter
+        RepeatFrameDone.         # done?
+        (
+          # no: keep frame
+
+            | ⋅[] # yes: destroy frame
+
+        )
+        | RepeatFrameFn
+      )
+    )
+    # -- runtime'  fnslice
+    ⊙(MakePlainFrame) # make frame from fn
+    # -- runtime newframe
+    ⍜RtCallStack(⊂ :) # push new frame onto callstack
+    # -- runtime
+
+  )
 )
 
 # jsonasm -- finalstack
 Run ← (|1
   ⊃(
     ⊐≡≡∘°□get "top_slices"
-    ≡MakeFrame # initial callstack from top_slices
+    ▽ ≡(±⊢⇌).       # drop empty slices
+    ≡MakePlainFrame # initial callstack from top_slices
+    MakeRuntime     # initial runtime from callstack
 
-  | °□get "instrs"
-    ≡(AnalyzeInstr °□)
+  | ≡(AnalyzeInstr °□)°□get "instrs"
   )
-  # -- callstack instrs
-  MakeRuntime # -- runtime instrs
+  # -- runtime instrs
   ⍢(
     |2.2 Advance ⊙. # keep instrs
 
-  | CallStackActive °□⊢
+  | ±⧻ RtCallStack # until callstack is empty
+
   )
   # -- runtime instrs
   ⊙;      # drop instrs
@@ -727,8 +801,8 @@ Run ← (|1
 )
 
 GetProgramPath ← ⍣(°□⊢&args|⋅"")
-EndsWith ← ≍ ⊃∘(↙¯⧻)
-IsImported ← ¬EndsWith "vm.ua" GetProgramPath
+EndsWith ← ≍ ⊃∘(↙¯↧∩⧻⊙.)
+IsImported ← ¬/↥[⊃(EndsWith "vm.ua"|EndsWith "vm.uasm"|=0⧻)] GetProgramPath
 
 StackColors ← +200×55⋯5_4_6_2_3_1
 
@@ -739,6 +813,7 @@ DumpColoredStack ← (
 Main ← (
   &fras °□ ⊡1 &args
   JsonParse
+
   Run
   DumpColoredStack
 )
@@ -1037,9 +1112,10 @@ RunTests ← &p⍜now(
     # $ /⊂ ⊠(⊂⊂) ⊙¤ [1 2] [3 4] [5 6]
 
     # repeat
-    # $ ⍥(+2)5 0
-    # $ ⍥(⊂2)5 []
-    # $ ⍥⊂3 [] 1 2 3
+    $ ⍥(+2)5 99 200
+    $ ⍥(+2)0 99 200
+    $ ⍥(⊂2)5 []
+    $ ⍥⊂3 [] 1 2 3
 
     # group
     # $ ⊕∘ [0 2 2 1 0 1] [1 2 3 4 5 6]
