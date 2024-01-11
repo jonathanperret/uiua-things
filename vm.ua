@@ -16,11 +16,13 @@ EmptyStack ← {}
 
 # runtime = { callstack stack tempstacks }
 
-MakeRuntime ← {⊙⊙∘}
+# callstack -- runtime
+MakeRuntime ← {⊃(∘|EmptyStack|{EmptyStack EmptyStack}|[])}
 
 RtCallStack ← °□⊡0
 RtStack ← °□⊡1
 RtTempStacks ← °□⊡2
+RtArrayStack ← °□⊡3
 
 # slice -- frame
 MakeFrame ← (|1
@@ -250,11 +252,48 @@ CallGlobal ← NotImplemented "CallGlobal"
 # {span index} runtime -- runtime'
 BindGlobal ← NotImplemented "BindGlobal"
 
-# { } runtime -- runtime'
-BeginArray ← NotImplemented "BeginArray"
+# [] runtime -- runtime'
+BeginArray ← (|2
+  ; # drop dummy arg
+  # -- runtime
+  # get current stack len
+  ⧻RtStack.
+  # push it onto arraystack
+  # -- stacklen runtime
+  ⍜⊙RtArrayStack ⊂
+)
 
-# {boxed span} runtime -- runtime'
-EndArray ← NotImplemented "EndArray"
+# boxed runtime -- runtime'
+EndArray ← (|2
+  # pop current stack contents
+  # -- boxed runtime
+  ⊙(
+    # -- runtime
+    ⍜RtArrayStack (
+      ⊃(↘1|¯°□⊢)
+    )
+    # -- runtime -startlevel
+    ⍜RtStack(⊃↙↘ :) # take and drop from bottom of stack
+
+  )
+  # -- boxed runtime' values
+  (
+    # unboxed: need to unbox stack values
+    ⊙(
+      ±⧻.
+      (
+        [] # special case for empty array
+
+        | ⊐≡∘
+      )
+    )
+  | # boxed: nothing to do
+
+  )
+  # -- runtime' value
+  ⍜RtStack (⊂□:) # push array to stack
+
+)
 
 # fn on stack = [ sig slice ]
 
@@ -490,9 +529,13 @@ AnalyzeInstr ← (
     {InstrTypePush ∘} # number literal
 
   | [] ⍤$"complex in JSON? _"⊙0
-  |                   # TODO: special case BeginArray, PopLocals, PopSig
-    {InstrTypePush ∘} # string literal
+  | ∊: {"BeginArray" "PopLocals"}□. # match instructions disguised as string literals
+    (
+      {InstrTypePush ∘} # nope, just a regular string literal
 
+    | {InstrTypeOther {⊙[]}} get: InstrNamesToIds # yep, a no-arg instr
+
+    )
   | type°□⊢.
     (
       |1       # array literal: [ type shape elements ]
@@ -529,15 +572,15 @@ AnalyzeInstr ← (
       get: InstrNamesToIds
       ⊃(⊙∘|∘)
       (
-        ∘ # Comment
+        ⋅[] # Comment(ident)
 
         | ∘ # CallGlobal
 
         | ∘ # BindGlobal
 
-        | ∘ # BeginArray
+        | ⋅[] # BeginArray
 
-        | ∘ # EndArray
+        | °□⊢ # EndArray(boxed, span)
 
         | ⋅[] # Call(span)
 
@@ -669,10 +712,6 @@ Run ← (|1
     ≡(AnalyzeInstr °□)
   )
   # -- callstack instrs
-  ⊙EmptyStack # stack
-  # -- callstack stack instrs
-  ⊙⊙{EmptyStack EmptyStack}
-  # -- callstack stack tempstacks instrs
   MakeRuntime # -- runtime instrs
   ⍢(
     |2.2 Advance ⊙. # keep instrs
@@ -925,6 +964,14 @@ RunTests ← &p⍜now(
 
     # Call
     $ F ← ⍤.1\tF
+
+    # BeginArray, EndArray
+    $ {. "hello"}
+    $ [. 123]
+    $ [. {. 123}]
+    $ [. 123 456] 789
+    $ {;1} 789
+    $ [;1] 789
 
     # reduce
     # $ /+ [1 2 3 4 5]
