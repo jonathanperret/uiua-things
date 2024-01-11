@@ -394,8 +394,10 @@ GetTempFunction ← NotImplemented "GetTempFunction"
 
 # count runtime -- runtime'
 TouchStack ← (|2
-  ⋅∘ # TODO update arraystack
-
+  ⍜⊙RtArrayStack (
+    # -- count arraystack
+    -
+  )
 )
 
 # [stackid count] runtime -- runtime'
@@ -965,13 +967,14 @@ RunTests ← &p⍜now(
     # Call
     $ F ← ⍤.1\tF
 
-    # BeginArray, EndArray
+    # BeginArray, EndArray, TouchStack
     $ {. "hello"}
     $ [. 123]
     $ [. {. 123}]
     $ [. 123 456] 789
     $ {;1} 789
     $ [;1] 789
+    $ {⊙∘} 1 2 3
 
     # reduce
     # $ /+ [1 2 3 4 5]
