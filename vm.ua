@@ -594,13 +594,53 @@ InstrNamesToIds ← map ⊃(∘|⇡⧻) InstrNames
 
 # instr = { (push|prim|other) (value|primid|{ instrid args }) }
 
+NullToNaN ← (∘|NaN) ≍[].
+
+DeserializeArray ← ↬(
+  : °{⊙⊙∘} # -- shape type elements
+  ⊓(
+    ⊐≡∘ # unbox shape
+
+  | # unbox elements
+    (
+      ≡(NullToNaN °□) # number array: replace nulls with NaN
+
+    | ℂ≡(∩NullToNaN °{:} °□) # complex array
+
+    | ♭≡°□ # char array
+
+    | # box array
+      ≡(
+        ⍜°□ (
+          type.
+          (
+            NullToNaN
+                | ⍤"complex in JSON?"0
+                | ∘
+                | |1 ↫ # nested array literal
+
+          )
+        )
+      )
+    )
+  )
+  # -- shape elements
+  ±⧻.
+  (
+    # scalar (used for char literals)
+    ⊢ ;
+  | # regular array: apply shape
+    ↯
+  )
+)
+
 # jsoninstr -- instr
 AnalyzeInstr ← (
   type.
   (
-    {InstrTypePush ∘} # number literal
-
-  | [] ⍤$"complex in JSON? _"⊙0
+    # number literal
+    {InstrTypePush NullToNaN}
+  | ⍤$"complex in JSON?"0
   | ∊: {"BeginArray" "PopLocals"}□. # match instructions disguised as string literals
     (
       {InstrTypePush ∘} # nope, just a regular string literal
@@ -610,33 +650,9 @@ AnalyzeInstr ← (
     )
   | type°□⊢.
     (
-      |1       # array literal: [ type shape elements ]
-      : °{⊙⊙∘} # -- shape type elements
-      ⊓(
-        ⊐≡∘ # unbox shape
-
-        | # unbox elements
-        (
-          # number array
-          ≡°□
-            | # complex array
-          ≡(ℂ°{:}°□)
-            | # char array
-          ♭≡°□
-            | # box array
-          ∘
-        )
-      )
-      # -- shape elements
-      ±⧻.
-      (
-        # scalar (used for char literals)
-        ⊢ ;
-        | # regular array: apply shape
-        ↯
-      )
+      DeserializeArray # array literal
       {InstrTypePush ∘}
-    | [] ⍤$"complex in JSON? _"⊙0
+    | ⍤$"complex in JSON?"0
     | #  [ "prim", span ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
     |                     # { "Instr": [ args… ] }
@@ -929,6 +945,12 @@ RunTests ← &p⍜now(
     $ ["x" "y"]
     $ {"x" "yz"}
     $ i
+    $ NaN
+    $ [NaN]
+    $ {NaN}
+    $ comptime(ℂ NaN NaN)
+    $ [{}]
+    $ {[]}
 
     # stack operations
     $ .2
