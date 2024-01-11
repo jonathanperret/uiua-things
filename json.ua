@@ -21,26 +21,37 @@ ParseString ← (
   ∊ @\\ . # check for easy string
   (
     ∘ # nothing to do
-  | ♭ regex "[^\\\\]+|\\\\."
+
+  | ♭ regex "[^\\\\]+|\\\\u[0-9a-fA-F]{4}|\\\\."
     ≡(
       =@\\⊢. # is it an escape?
       (
         ∘
         | ⍜°□(
           ↘1
-          (∘|⋅"\n") ≍"n". # recognize \n
+          ⊗: "nrtu" ⊢.
+          (
+            ⋅"\n"
+                | ⋅"\r"
+                | ⋅"\t"
+                | [+@\0] ∧(+⊙(×16)) ⊙0 ◿16 ⊗:"0123456789abcdef0123456789ABCDEF" ↘1
+                | ∘
+          )
         )
       )
     )
-    /⊐⊂ # collect parts
+    ⊐/⊂ # collect parts
+
   )
 )
 
 # ( idx tokens -- value idx tokens )
 Parse ← ↬(|2.3
   ⊃(
-    °□⊡    # pick next token
+    °□⊡ # pick next token
+
   | ⊓(+1)∘ # advance index
+
   )
   ⊗:"\"ntf{["⊢. # classify token
   (∘|-1)≥5.     # merge [ and {
@@ -70,20 +81,25 @@ Parse ← ↬(|2.3
           ¬∊:"}]" ⊃(⊢⊡;|⊙⊙∘) # peek at next token
           (
             # closing brace: object/array done
-            ⊙(+1)      # eat closing brace
-            0          # exit loop
+            ⊙(+1) # eat closing brace
+            0     # exit loop
+
                 |      # not a closing brace: there's a value next
             ⊙(|2.3 □↫) # read value, box it
             ⊂          # append value
             1          # continue loop
+
           )
         )∘ # while continue-flag is 1
         # -- continue-flag array tokens'
         ; # drop continue-flag
+
       )
     )
     (∘|map°⊟⍉↯¯1_2)=@{⊢ # make map if object
-  | ⋕                   # number
+
+  | ⋕ # number
+
   )
 )
 
@@ -92,6 +108,7 @@ JsonParse ← (
   Log "tokens" ⧻.
   Log "Parse" ⍜now Parse 0
   ⊙⋅; # drop idx, tokens
+
 )
 
 ---
@@ -119,6 +136,18 @@ Aeq {"null"}
 $ "hello\\nwor\\\\d"
 ParseString
 Aeq "hello\nwor\\d"
+
+$ "\\u0000"
+ParseString
+Aeq "\0"
+
+$ "\\u1000"
+ParseString
+Aeq "\u1000"
+
+$ "\\u20aC"
+ParseString
+Aeq "€"
 
 $ {"x":3, "y":[1, 2]}
 Aeq {{"x" "y"} {3 {1 2}}} {°map} JsonParse

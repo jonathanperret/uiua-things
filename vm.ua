@@ -137,8 +137,8 @@ MonadicOneOutputFns ← (
 | ∘ ToDo "inv_parse"
 | ∘ ToDo "inv_trace"
 | ∘ ToDo "inv_utf"
-| ∘ ToDo "inv_where"
-| ∘ ToDo "inverse_bits"
+| °⊚
+| °⋯
 | Last
 | ∘ ToDo "last_max_index"
 | ∘ ToDo "last_min_index"
@@ -218,7 +218,7 @@ DyadicTwoOutputFns ← (:|⍤"bad prim id"0)
 DyadicThreeOutputNames ← {"over"}
 DyadicThreeOutputFns ← (,|⍤"bad prim id"0 ,)
 
-TriadicNoOutputNames ← {
+TriadicOneOutputNames ← {
   "insert"
   "undrop"
   "unkeep"
@@ -300,7 +300,7 @@ PrimNameLists ← {
   DyadicOneOutputNames
   DyadicTwoOutputNames
   DyadicThreeOutputNames
-  TriadicNoOutputNames
+  TriadicOneOutputNames
   SpecialNames}
 
 PrimIds ← ≡(□≡⊂⊙°□) ⊃(⇡⧻|≡(□⇡⧻)) PrimNameLists
@@ -887,12 +887,12 @@ Escape ← ↘¯1 ⊐/⊂ ↘1♭≡⊂ ⊃(□⊂@\\|⊕□⍜▽¯:\+.=, ⊙(�
 MakeCheckProgram ← (
   ⊃(
     ⍤"must run with absolute path for tests"=@/⊢. GetProgramPath
-  | ⊜□≠@\t.
+  | ⊜□≠@§.
     ⊃(
       (""|⊐/$"_\n_") ±⧻. ↘¯1
     | °□⊢⇌
     )
-  | $"\"_\"" Replace @\t "\\n" Escape @" Escape @\\ Escape @\\
+  | $"\"_\"" Replace @§ "\\n" Escape @" Escape @\\
   )
   $ # Experimental!
   $ Check ← &i "_" "Check"
@@ -951,6 +951,8 @@ RunTests ← &p⍜now(
     $ comptime(ℂ NaN NaN)
     $ [{}]
     $ {[]}
+    $ @\\t
+    $ -@\\x00 @Z
 
     # stack operations
     $ .2
@@ -1084,7 +1086,7 @@ RunTests ← &p⍜now(
     $ ⊢⇌[1 2 3]
 
     # Call
-    $ F ← ⍤.1\tF
+    $ F ← ⍤.1 § F
 
     # BeginArray, EndArray, TouchStack
     $ {. "hello"}
@@ -1098,9 +1100,18 @@ RunTests ← &p⍜now(
     $ [=] 1 2
     $ [:] 1 2
     $ [,] 1 2
-    $ [insert 5 6] map 1_2 3_4
+    $ [insert 5 6] map [1 2] [3 4]
     $ [.] 1
     $ [$"hello \_"] 123
+
+    # inv_where
+    $ °⊚[0 3 5 6]
+
+    # inverse_bits
+    $ °⋯ [1 0 1]
+
+    # unrerank
+    # $ ⍜(☇0)∘ [[2 3][4 5]]
 
     # reduce
     # $ /+ [1 2 3 4 5]
