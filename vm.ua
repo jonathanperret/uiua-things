@@ -11,15 +11,33 @@ MapPairs ← ⍉⊟°map
 
 EmptyStack ← {}
 
-# runtime = { callstack stack tempstacks }
+# runtime = { callstack stack tempstacks arraystack }
 
 # callstack -- runtime
 MakeRuntime ← {⊃(∘|EmptyStack|{EmptyStack EmptyStack}|[])}
 
-RtCallStack ← °□⊡0
+RtCallStack ← °□⊢
 RtStack ← °□⊡1
 RtTempStacks ← °□⊡2
 RtArrayStack ← °□⊡3
+
+# count runtime -- runtime'
+RtTouchStack ← (|2
+  - ⊙(⧻RtStack.) # compute stacklength if count values were popped
+  # -- newlength runtime
+  ⍜⊙RtArrayStack ↧ # lower arraystack entries if above newlength
+
+)
+
+# count runtime -- values runtime'
+RtPop ← (
+  ⊃(∘|RtTouchStack)
+  # -- count runtime'
+  ⍜⊙RtStack ⊃↙↘
+)
+
+# value(s) runtime -- runtime'
+RtPush ← ⍜⊙RtStack ⊂
 
 FrameTypePlain ← 0
 FrameTypeRepeat ← 1
@@ -220,21 +238,19 @@ TriadicOneOutputFns ← (
 
 # runtime -- runtime'
 Identity ← (|1
-  ⍜RtArrayStack (-1) # touch stack
-
+  RtTouchStack 1
 )
 
 # runtime -- runtime'
 Repeat ← (|1
-  ⍜RtStack ⊃(↘2|°{⊙∘}↙2) # get fn and repeat count from stack
-  # -- runtime fn count
-  ⊃(±⋅⋅∘|⊙⊙∘)
+  °{⊙∘} RtPop 2 # get fn and repeat count from stack
+  # -- fn count runtime'
+  ⊃(⋅±|MakeRepeatFrame :)
   (
-    # special case 0 count: do nothing
-    ⊙⋅;
-  | ⊙(MakeRepeatFrame :)
-    # -- runtime newframe
-    ⍜RtCallStack (⊂:)
+    # special case 0 count: do nothing (return runtime)
+    ⋅∘
+  | # -- newframe runtime
+    ⍜⊙RtCallStack ⊂
   )
 )
 
@@ -294,18 +310,18 @@ PrimNamesToIds ← map ∩⊐/⊂ PrimNameLists PrimIds
 # primid runtime -- runtime'
 ExecPrimitive ← (
   °⊟
-  # -- primtype primsubid
+  # -- primtype primsubid runtime
   (
-    ⍜⊙RtStack(NoadicNoOutputFns)
-  | ⍜⊙RtStack(⊂□ NoadicOneOutputFns)
-  | ⍜⊙RtStack(MonadicNoOutputFns ⊙⊃(°□⊢|↘1))
-  | ⍜⊙RtStack(⊂□ MonadicOneOutputFns ⊙⊃(°□⊢|↘1))
-  | ⍜⊙RtStack(⊂{⊙∘} MonadicTwoOutputFns ⊙⊃(°□⊢|↘1))
-  | ⍜⊙RtStack(DyadicNoOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
-  | ⍜⊙RtStack(⊂□ DyadicOneOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
-  | ⍜⊙RtStack(⊂{⊙∘} DyadicTwoOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
-  | ⍜⊙RtStack(⊂{⊙⊙∘} DyadicThreeOutputFns ⊙⊃(°{⊙∘}↙2|↘2))
-  | ⍜⊙RtStack(⊂□ TriadicOneOutputFns ⊙⊃(°{⊙⊙∘}↙3|↘3))
+    NoadicNoOutputFns
+  | RtPush □ NoadicOneOutputFns
+  | MonadicNoOutputFns ⊙(°{∘}RtPop 1)
+  | RtPush □ MonadicOneOutputFns ⊙(°{∘}RtPop 1)
+  | RtPush {⊙∘} MonadicTwoOutputFns ⊙(°{∘}RtPop 1)
+  | DyadicNoOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush □ DyadicOneOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush {⊙∘} DyadicTwoOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush {⊙⊙∘} DyadicThreeOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush □ TriadicOneOutputFns ⊙(°{⊙⊙∘}RtPop 3)
   | SpecialFns
   )
 )
@@ -329,6 +345,7 @@ BeginArray ← (|2
   # -- stacklen runtime
   ⍜⊙RtArrayStack ⊂
 )
+
 # boxed runtime -- runtime'
 EndArray ← (|2
   # pop current stack contents
@@ -357,57 +374,41 @@ EndArray ← (|2
 
   )
   # -- runtime' value
-  ⍜RtStack (⊂□:) # push array to stack
-
+  RtPush □:
 )
 
 # fn on stack = [ sig slice ]
 
 # [] runtime -- runtime'
 Call ← (|2
-  ⋅⍜RtStack (
-    # -- stack index
-    ⊃(↘1|⊡1°□⊢)
-    # -- stack'
-
-  )
-  # -- runtime fnslice
-  ⍜RtCallStack(⊂ MakePlainFrame :) # push new frame onto callstack
+  MakePlainFrame ⊡1°{∘} RtPop 1 ;
+  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
 
 )
 
 # [ sig slice ] runtime -- runtime'
-PushFunc ← (
-  ⍜⊙RtStack(⊂□) # push fn
-
-)
+PushFunc ← RtPush □
 
 # {fncount sig} runtime -- runtime'
 Switch ← (|2
-  ⍜⊙RtStack (
-    # -- {fncount sig} stack
-    °{⊙∘} # get fncount, sig
-    # -- fncount sig stack
-    ⊃(
-      -:-1 ⊃(∘|°□⊡ ⊙⋅∘|⋅⋅∘) # pick selector after fns, compute selected pos
-      °□⊡                   # pick selected fn # TODO: array selectors
-
-    | ⋅∘ # keep sig
-
-    | ↘ +1 ⊙⋅∘ # drop fns and selector from stack
-
-    )
-    # -- fn sig stack
-    :°⊟ # extract fnsig and fnslice
-    # -- fnslice fnsig sig stack
-    ⊓(
-      MakePlainFrame
-    |                 # compute args to discard
-      ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # sig.args stack ((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
-      ⍜↙(↘ ¯:)        # discard extra args
+  °{⊙∘} # get fncount, sig
+  # -- fncount sig runtime
+  ⊃(⋅∘|RtPop +1 ⊙⋅∘) # pop fns and selector
+  # -- sig values runtime'
+  ⊙(°□⊡ -2 ¯°□⊢⇌.) # pick selected fn # TODO: array selectors
+  # -- sig fn runtime
+  ⊃(:°⊟ ⋅∘|⊙⋅∘)
+  # -- fnslice fnsig sig runtime
+  ⊓(
+    MakePlainFrame
+  |                 # compute args to discard
+    ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # -- sig.args runtime discardcount=((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
+    ⍜⊙RtStack (
+      # -- takecount stack discardcount
+      ⍜↙(↘ ¯:) # discard extra args
 
     )
-    # -- newframe stack'
+    # --runtime
 
   )
   # -- newframe runtime
@@ -417,14 +418,21 @@ Switch ← (|2
 
 # parts runtime -- runtime'
 Format ← (|2
-  ⍜⊙RtStack (
-    # -- parts stack
-    ⊃(∘|≡⍜°□$"_" ⊃↙↘ -1⧻) # take (parts-1) values from stack, stringify them
-    ♭⍉⬚(□"")⊟             # alternate fragments and values
-    ⊐/⊂                   # join everything up
-    ⊂□                    # push resulting string
+  ⊃(-1⧻|⋅∘|∘)
+  # -- runtime placeholdercount parts
+  :RtPop
+  # -- runtime' values parts
+  ⊙(
+    ≡(⍜°□$"_") # stringify values
+    # -- strings parts
+    ♭⍉⬚(□"")⊟: # alternate fragments and values
+    # -- strings
+    ⊐/⊂ # join everything up
 
   )
+  # -- runtime result
+  RtPush □ : # push resulting string
+
 )
 
 # {func} runtime -- runtime'
@@ -451,21 +459,13 @@ PopTempFunctions ← ∘ToDo "PopTempFunctions"
 # {offset sig span} runtime -- runtime'
 GetTempFunction ← ∘ToDo "GetTempFunction"
 
-# count runtime -- runtime'
-TouchStack ← (|2
-  ⍜⊙RtArrayStack (
-    # -- count arraystack
-    -
-  )
-)
+TouchStack ← RtTouchStack
 
 # [stackid count] runtime -- runtime'
 PushTemp ← (|2
   °⊟
   # -- stackid count runtime
-  ⊙⍜⊙RtStack ⊃↙↘ # take from stack
-  # -- stackid values runtime'
-  ⊙:
+  ⊙(:RtPop)
   # -- stackid runtime values
   ⍜(°□⊡⊙RtTempStacks) (⊂⇌:)
 )
@@ -476,7 +476,7 @@ PopTemp ← (|2
   # -- count stackid runtime
   ⍜(⊙(°□⊡) ⊙⊙RtTempStacks) ⊃↙↘
   # -- runtime values
-  ⍜⊙RtStack (⊂⇌) # push to stack
+  RtPush ⇌ # push to stack
 
 )
 
@@ -498,7 +498,7 @@ CopyFromTemp ← (|2
   # -- count offset tempstack runtime
   ↙ ⊙↘
   # -- values runtime
-  ⍜⊙RtStack (⊂⇌) # push to stack
+  RtPush⇌ # push to stack
 
 )
 
@@ -520,17 +520,11 @@ SetOutputComment ← ∘ToDo "SetOutputComment"
 
 # count runtime -- runtime'
 TransposeN ← (|2
-  :
-  # -- runtime count
-  ⍜RtStack(
-    # -- stack count
-    ⊃(⋅∘|°□⊢|↘1)
-    # -- count array stack'
-    (⍥⍉|⍥°⍉¯) <0. # repeat transpose
-    # -- result stack
-    ⊂□ # push result
+  ⊙(°{∘}RtPop 1)
+  # -- count array runtime
+  (⍥⍉|⍥°⍉¯) <0. # repeat transpose
+  RtPush □      # push result
 
-  )
 )
 
 InstrTypePush ← 0
@@ -724,10 +718,8 @@ ExecInstr ← (|2
   (
     # push
     # -- value runtime
-    ⍜⊙RtStack(
-      ⊂□ # push onto stack
+    RtPush □ # push onto stack
 
-    )
   | # prim
     # -- primid runtime
     ExecPrimitive
@@ -1081,6 +1073,12 @@ RunTests ← &p⍜now(
     $ [;1] 789
     $ {⊙∘} 1 2 3
     $ [∘] 1
+    $ [=] 1 2
+    $ [:] 1 2
+    $ [,] 1 2
+    $ [insert 5 6] map 1_2 3_4
+    $ [.] 1
+    $ [$"hello \_"] 123
 
     # reduce
     # $ /+ [1 2 3 4 5]
