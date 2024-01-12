@@ -15,6 +15,7 @@ TestCases ← {
   $ [NaN]
   $ {NaN}
   $ comptime(ℂ NaN NaN)
+  $ comptime(map [1] [2])
   $ [{}]
   $ {[]}
   $ @\\t
@@ -175,6 +176,9 @@ TestCases ← {
 
   # inverse_bits
   $ °⋯ [1 0 1]
+
+  # under now
+  $ >0 ⍜now (+1 2)
 
   # unrerank
   # $ ⍜(☇0)∘ [[2 3][4 5]]

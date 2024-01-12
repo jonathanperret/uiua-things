@@ -679,9 +679,8 @@ DeserializeArray ← ↬(
   )
 )
 
-# -- instrid jsoninstrargs
-PreProcessInstr ← (
-  ⊃(⊙∘|∘)
+# instrid jsoninstrargs -- instrargs
+PreProcessInstrArgs ← (|2
   (
     ⋅[] # Comment(ident)
 
@@ -742,16 +741,11 @@ PreProcessInstr ← (
 AnalyzeInstr ← (
   type.
   (
-    # number literal
-    {InstrTypePush NullToNaN}
+    {InstrTypePush NullToNaN} # number literal
+
   | ⍤$"complex in JSON?"0
-  | ∊: {"BeginArray" "PopLocals"}□. # match instructions disguised as string literals
-    (
-      {InstrTypePush ∘} # nope, just a regular string literal
+  | {InstrTypePush ∘} # string literal
 
-    | {InstrTypeOther {⊙[]}} get: InstrNamesToIds # yep, a no-arg instr
-
-    )
   | type°□⊢.
     (
       DeserializeArray # array literal
@@ -759,19 +753,18 @@ AnalyzeInstr ← (
     | ⍤$"complex in JSON?"0
     | #  [ "prim", span ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
-    |                     # { "Instr": [ args… ] }
-      =3⍣(type°□⊢°□⊢)⋅⋅0. # detect [ { "transpose_n": n } ]
+    | =3⍣(type°□⊢°□⊢)⋅⋅0. # detect [ { "transpose_n": n } ]
       (
+        # regular instr: { "Instr": [ args… ] }
         °[{⊙∘}] MapPairs
         get: InstrNamesToIds
-        PreProcessInstr
-        :
-        {InstrTypeOther {⊙∘}}
-        | # other
+        # -- instrid jsoninstrargs
+        ⊃∘ PreProcessInstrArgs
+        | # [ { "transpose_n": n } ] # transpose_n
         °{⊙∘}⊢MapPairs°□⊢
         get: InstrNamesToIds
-        {InstrTypeOther {⊙∘}}
       )
+      {InstrTypeOther {⊙∘}}
     )
   )
 )
