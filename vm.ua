@@ -41,8 +41,9 @@ RtPush ← ⍜⊙RtStack ⊂
 
 FrameTypePlain ← 0
 FrameTypeRepeat ← 1
+FrameTypeReduce ← 2
 
-# frame = { frametype ({ pc addrs } | { counter count fn }) }
+# frame = { frametype ({ pc addrs } | { counter count fn } | { counter array fnslice }) }
 
 # slice -- frame
 MakePlainFrame ← (|1
@@ -55,9 +56,23 @@ MakePlainFrame ← (|1
 # count [fnsig fnslice] -- frame
 MakeRepeatFrame ← (|2
   ⊙(⊢⇌) # keep only fnslice
-  0     # pc
+  0     # counter
   {⊙⊙∘}
   {FrameTypeRepeat ∘}
+)
+
+# [fnsig fnslice] array -- frame
+MakeReduceFrame ← (|2
+  {
+    ⊃(
+      1 # counter starts at 1
+
+    | ⋅∘ # array
+
+    | ⊢⇌ # keep only fnslice
+
+    )  }
+  {FrameTypeReduce ∘}
 )
 
 FrameType ← °□⊡0
@@ -254,13 +269,42 @@ Repeat ← (|1
   )
 )
 
+# runtime -- runtime'
+Reduce ← (|1
+  °{⊙∘} RtPop 2 # get fn and array from stack
+  # -- fn array runtime'
+  ↧2⧻, # check for empty or singleton/scalar array
+  (
+    # empty
+    ⋅⋅∘ # drop fn and array
+    ⍤"cannot reduce empty array"0
+    # RtPush □ # TODO: introspect fn to determine correct default value
+
+  |   # singleton or scalar
+    ; # drop fn
+    ±⧻△.
+    (
+      # scalar
+      RtPush □ # just push it
+
+    |            # singleton
+      RtPush □ ⊢ # just push the only element
+
+    )
+  | # more than 1
+    ⊃(MakeReduceFrame|RtPush □ ⋅⊢)
+    # -- newframe runtime'
+    ⍜⊙RtCallStack ⊂
+  )
+)
+
 SpecialNames ← {
   "identity" "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
   "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
-  "inv_dump" "inv_scan" "ungroup" "unpartition"}
+  "inv_dump" "inv_scan" "ungroup" "unpartition" "all"}
 SpecialFns ← (
   Identity
-| ToDo "reduce"
+| Reduce
 | ToDo "fold"
 | ToDo "scan"
 | ToDo "each"
@@ -288,6 +332,7 @@ SpecialFns ← (
 | ToDo "inv_scan"
 | ToDo "ungroup"
 | ToDo "unpartition"
+| ToDo "all"
 )
 
 PrimNameLists ← {
@@ -634,6 +679,65 @@ DeserializeArray ← ↬(
   )
 )
 
+# -- instrid jsoninstrargs
+PreProcessInstr ← (
+  ⊃(⊙∘|∘)
+  (
+    ⋅[] # Comment(ident)
+
+  | ∘ # CallGlobal
+
+  | ∘ # BindGlobal
+
+  | ⋅[] # BeginArray
+
+  | °□⊢ # EndArray(boxed, span)
+
+  | ⋅[] # Call(span)
+
+  | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
+
+  | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
+
+  | °□⊢ # Format(parts, span)
+
+  | ∘ # Dynamic
+
+  | ∘ # PushLocals
+
+  | ∘ # PopLocals
+
+  | ∘ # GetLocal
+
+  | ∘ # Unpack
+
+  | ∘ # PushTempFunctions
+
+  | ∘ # PopTempFunctions
+
+  | ∘ # GetTempFunction
+
+  | °□⊢ # TouchStack(count, span)
+
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
+
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
+
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
+
+  | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
+
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
+
+  | ∘ # PushSig
+
+  | ∘ # PopSig
+
+  | ∘ # SetOutputComment
+
+  )
+)
+
 # jsoninstr -- instr
 AnalyzeInstr ← (
   type.
@@ -660,61 +764,7 @@ AnalyzeInstr ← (
       (
         °[{⊙∘}] MapPairs
         get: InstrNamesToIds
-        ⊃(⊙∘|∘)
-        (
-          ⋅[] # Comment(ident)
-
-            | ∘ # CallGlobal
-
-            | ∘ # BindGlobal
-
-            | ⋅[] # BeginArray
-
-            | °□⊢ # EndArray(boxed, span)
-
-            | ⋅[] # Call(span)
-
-            | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
-
-            | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
-
-            | °□⊢ # Format(parts, span)
-
-            | ∘ # Dynamic
-
-            | ∘ # PushLocals
-
-            | ∘ # PopLocals
-
-            | ∘ # GetLocal
-
-            | ∘ # Unpack
-
-            | ∘ # PushTempFunctions
-
-            | ∘ # PopTempFunctions
-
-            | ∘ # GetTempFunction
-
-            | °□⊢ # TouchStack(count, span)
-
-            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
-
-            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
-
-            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
-
-            | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
-
-            | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
-
-            | ∘ # PushSig
-
-            | ∘ # PopSig
-
-            | ∘ # SetOutputComment
-
-        )
+        PreProcessInstr
         :
         {InstrTypeOther {⊙∘}}
         | # other
@@ -764,6 +814,22 @@ RepeatFrameDone ← /≤ ↙2 °□⊢⇌
 # { frametype { counter count fn } } -- fn
 RepeatFrameFn ← °□⊡2 °□⊢⇌
 
+# { frametype { counter array fnslice } } -- counter
+ReduceFrameCounter ← °□⊢°□⊢⇌
+
+# { frametype { counter array fnslice } } -- bool
+ReduceFrameDone ← ≤⊙⧻°{⊙∘}↙2°□⊢⇌
+---
+⍤⊃⋅∘≍ 0 ReduceFrameDone {FrameTypeReduce {0 [123] [1 2]}}
+⍤⊃⋅∘≍ 1 ReduceFrameDone {FrameTypeReduce {1 [123] [1 2]}}
+---
+
+# { frametype { counter array fnslice } } -- array
+ReduceFrameArray ← °□⊡1°□⊢⇌
+
+# { frametype { counter array fnslice } } -- fnslice
+ReduceFrameFn ← °□⊡2°□⊢⇌
+
 # runtime instrs -- runtime'
 Advance ← (|2
   # -- runtime instrs
@@ -806,7 +872,34 @@ Advance ← (|2
       )
     )
     # -- runtime'  fnslice
-    ⊙(MakePlainFrame) # make frame from fn
+    ⊙MakePlainFrame # make frame from fn
+    # -- runtime newframe
+    ⍜RtCallStack(⊂ :) # push new frame onto callstack
+    # -- runtime
+
+  | # reduce frame
+
+    ⍜(⊢RtCallStack)(|1.3
+      # -- topframe
+      ⊃(
+        ⍜ReduceFrameCounter (+1) # bump counter
+        ReduceFrameDone.         # done?
+        (
+          # no: keep frame
+
+            | ⋅[] # yes: destroy frame
+
+        )
+        | ⊃(°□⊡⊃(ReduceFrameCounter|ReduceFrameArray)|ReduceFrameFn)
+      )
+      # -- topframe elt fnslice
+
+    )
+    # -- runtime' elt fnslice
+    RtPush □:
+    ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
+    # -- runtime' fnslice
+    ⊙MakePlainFrame # make frame from fn
     # -- runtime newframe
     ⍜RtCallStack(⊂ :) # push new frame onto callstack
     # -- runtime
@@ -1114,12 +1207,15 @@ RunTests ← &p⍜now(
     # $ ⍜(☇0)∘ [[2 3][4 5]]
 
     # reduce
-    # $ /+ [1 2 3 4 5]
-    # $ /- [1 2 3 4 5]
-    # $ /- [1 2 3 4 5]
-    # $ \- [1 2 3 4 5]
-    # $ /(×+1) [1 2 3 4 5]
-    # $ /⊂ .↯[2 2 4]⇡16
+    $ /+ [1 2 3 4 5]
+    $ /- [1 2 3 4 5]
+    $ /- [1 2 3 4 5]
+    $ /(×+1) [1 2 3 4 5]
+    $ /⊂ [[0 1][2 3]]
+    $ /⊂ ↯[2 2 4]⇡16
+    $ /+ [123]
+    $ /+ 123
+    $ /× ↯3_0 0
     # $ /+ []
     # $ /× []
     # $ /↥ []
@@ -1147,10 +1243,10 @@ RunTests ← &p⍜now(
     # $ ∵(⊟.) [1 2 3 4]
     # $ ∵⊂ [1 2 3] [4 5 6]
     # $ ∵⊂ [1 2] [[4 5] [6 7]]
-    # $  + [1 2 3] [4 5 6]
+    $  + [1 2 3] [4 5 6]
 
     # rows
-    # $  /+ [[1 2 3] [4 5 6] [7 8 9]]
+    $  /+ [[1 2 3] [4 5 6] [7 8 9]]
     # $ ≡/+ [[1 2 3] [4 5 6] [7 8 9]]
     # $ ≡/+ [[1 2] [3 4]] [5 6]
     # $ ≡⊂  [[1 2] [3 4]] [5 6]
