@@ -26,7 +26,6 @@ RtTouchStack ← (|2
   - ⊙(⧻RtStack.) # compute stacklength if count values were popped
   # -- newlength runtime
   ⍜⊙RtArrayStack ↧ # lower arraystack entries if above newlength
-
 )
 
 # count runtime -- values runtime'
@@ -39,9 +38,13 @@ RtPop ← (
 # value(s) runtime -- runtime'
 RtPush ← ⍜⊙RtStack ⊂
 
+FnSig ← ⊢
+FnSlice ← ⊢⇌
+
 FrameTypePlain ← 0
 FrameTypeRepeat ← 1
 FrameTypeReduce ← 2
+FrameTypeScan ← 3
 
 # frame = { frametype ({ pc addrs } | { counter count fn } | { counter array fnslice }) }
 
@@ -55,8 +58,8 @@ MakePlainFrame ← (|1
 
 # count [fnsig fnslice] -- frame
 MakeRepeatFrame ← (|2
-  ⊙(⊢⇌) # keep only fnslice
-  0     # counter
+  ⊙FnSlice # keep only fnslice
+  0        # counter
   {⊙⊙∘}
   {FrameTypeRepeat ∘}
 )
@@ -65,14 +68,27 @@ MakeRepeatFrame ← (|2
 MakeReduceFrame ← (|2
   {
     ⊃(
-      1 # counter starts at 1
-
+      1  # counter starts at 1
     | ⋅∘ # array
 
-    | ⊢⇌ # keep only fnslice
+    | FnSlice # keep only fnslice
 
     )  }
   {FrameTypeReduce ∘}
+)
+
+# fn array acc -- { frametype { counter array fnslice acc }
+MakeScanFrame ← (
+  {
+    ⊃(
+      1  # counter starts at 1
+    | ⋅∘ # array
+
+    | FnSlice # keep only fnslice
+
+    | ⋅(↙1)
+    )  }
+  {FrameTypeScan ∘}
 )
 
 FrameType ← °□⊡0
@@ -92,7 +108,7 @@ NoadicOneOutputNames ← {"tag" "now" "eta" "pi" "tau" "infinity" "scan_line" "r
 NoadicOneOutputFns ← (tag|now|η|π|τ|∞|&sc|⚂|Args)
 
 MonadicNoOutputNames ← {"pop" "show" "prin" "print" "change_directory" "im_show"}
-MonadicNoOutputFns ← (;|&s|&pf|&p|&cd|&ims)
+MonadicNoOutputFns ← (◌|&s|&pf|&p|&cd|&ims)
 
 Last ← (|1
   ⊢⇌
@@ -279,22 +295,55 @@ Reduce ← (|1
     ⋅⋅∘ # drop fn and array
     ⍤"cannot reduce empty array"0
     # RtPush □ # TODO: introspect fn to determine correct default value
-
   |   # singleton or scalar
-    ; # drop fn
+    ◌ # drop fn
     ±⧻△.
     (
       # scalar
-      RtPush □ # just push it
-
+      RtPush □   # just push it
     |            # singleton
       RtPush □ ⊢ # just push the only element
-
     )
   | # more than 1
     ⊃(MakeReduceFrame|RtPush □ ⋅⊢)
     # -- newframe runtime'
     ⍜⊙RtCallStack ⊂
+  )
+)
+
+# runtime -- runtime'
+Scan ← (|1
+  °{⊙∘} RtPop 2 # get fn and array from stack
+  # -- fn array runtime'
+  ↧2⧻, # check for empty or singleton/scalar array
+  (
+    # empty
+    ⋅∘       # drop fn
+    RtPush □ # re-push empty array
+  |          # singleton or scalar
+    ◌        # drop fn
+    ±⧻△.
+    (
+      # scalar
+      ⍤"Cannot \\ scan rank 0 array" ⋅0
+    |          # singleton
+      RtPush □ # just push it back
+    )
+  | # more than 1
+    # -- fn array runtime
+    ⊃(
+      # initialize scan frame: accumulator = 1-prefix of array
+      MakeScanFrame
+    | # set up first call with first and second elements
+
+      ◌ # drop fn
+      RtPush ≡□ ↙2
+    | FnSlice
+    )
+    # -- newframe runtime' fnslice
+    :⍜⊙RtCallStack ⊂
+    # -- fnslice runtime'
+    ⍜⊙RtCallStack ⊂ MakePlainFrame
   )
 )
 
@@ -306,7 +355,7 @@ SpecialFns ← (
   Identity
 | Reduce
 | ToDo "fold"
-| ToDo "scan"
+| Scan
 | ToDo "each"
 | ToDo "rows"
 | ToDo "table"
@@ -382,7 +431,7 @@ BindGlobal ← ∘ToDo "BindGlobal"
 
 # [] runtime -- runtime'
 BeginArray ← (|2
-  ; # drop dummy arg
+  ◌ # drop dummy arg
   # -- runtime
   # get current stack len
   ⧻RtStack.
@@ -402,7 +451,6 @@ EndArray ← (|2
     )
     # -- runtime -startlevel
     ⍜RtStack(⊃↙↘ :) # take and drop from bottom of stack
-
   )
   # -- boxed runtime' values
   (
@@ -411,7 +459,6 @@ EndArray ← (|2
       ±⧻.
       (
         [] # special case for empty array
-
         | ⊐≡∘
       )
     )
@@ -426,9 +473,8 @@ EndArray ← (|2
 
 # [] runtime -- runtime'
 Call ← (|2
-  MakePlainFrame ⊡1°{∘} RtPop 1 ;
+  MakePlainFrame ⊡1°{∘} RtPop 1 ◌
   ⍜⊙RtCallStack ⊂ # push new frame onto callstack
-
 )
 
 # [ sig slice ] runtime -- runtime'
@@ -442,7 +488,7 @@ Switch ← (|2
   # -- sig values runtime'
   ⊙(°□⊡ -2 ¯°□⊢⇌.) # pick selected fn # TODO: array selectors
   # -- sig fn runtime
-  ⊃(:°⊟ ⋅∘|⊙⋅∘)
+  ⊃(⊃FnSlice FnSig ⋅∘|⊙⋅∘)
   # -- fnslice fnsig sig runtime
   ⊓(
     MakePlainFrame
@@ -451,14 +497,11 @@ Switch ← (|2
     ⍜⊙RtStack (
       # -- takecount stack discardcount
       ⍜↙(↘ ¯:) # discard extra args
-
     )
     # --runtime
-
   )
   # -- newframe runtime
   ⍜⊙RtCallStack ⊂ # push new frame onto callstack
-
 )
 
 # parts runtime -- runtime'
@@ -473,11 +516,9 @@ Format ← (|2
     ♭⍉⬚(□"")⊟: # alternate fragments and values
     # -- strings
     ⊐/⊂ # join everything up
-
   )
   # -- runtime result
   RtPush □ : # push resulting string
-
 )
 
 # {func} runtime -- runtime'
@@ -522,7 +563,6 @@ PopTemp ← (|2
   ⍜(⊙(°□⊡) ⊙⊙RtTempStacks) ⊃↙↘
   # -- runtime values
   RtPush ⇌ # push to stack
-
 )
 
 # [stackid count] runtime -- runtime'
@@ -544,7 +584,6 @@ CopyFromTemp ← (|2
   ↙ ⊙↘
   # -- values runtime
   RtPush⇌ # push to stack
-
 )
 
 # [stackid count] runtime -- runtime'
@@ -569,7 +608,6 @@ TransposeN ← (|2
   # -- count array runtime
   (⍥⍉|⍥°⍉¯) <0. # repeat transpose
   RtPush □      # push result
-
 )
 
 InstrTypePush ← 0
@@ -645,11 +683,9 @@ DeserializeArray ← ↬(
   : °{⊙⊙∘} # -- shape type elements
   ⊓(
     ⊐≡∘ # unbox shape
-
-  | # unbox elements
+  |     # unbox elements
     (
-      ≡(NullToNaN °□) # number array: replace nulls with NaN
-
+      ≡(NullToNaN °□)        # number array: replace nulls with NaN
     | ℂ≡(∩NullToNaN °{:} °□) # complex array
 
     | ♭≡°□ # char array
@@ -673,7 +709,7 @@ DeserializeArray ← ↬(
   ±⧻.
   (
     # scalar (used for char literals)
-    ⊢ ;
+    ⊢ ◌
   | # regular array: apply shape
     ↯
   )
@@ -683,8 +719,7 @@ DeserializeArray ← ↬(
 PreProcessInstrArgs ← (|2
   (
     ⋅[] # Comment(ident)
-
-  | ∘ # CallGlobal
+  | ∘   # CallGlobal
 
   | ∘ # BindGlobal
 
@@ -694,9 +729,9 @@ PreProcessInstrArgs ← (|2
 
   | ⋅[] # Call(span)
 
-  | [⊓(;|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
+  | [⊓(◌|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
 
-  | {⊓(∘|⊐≡∘|;)} °{⊙⊙∘} # Switch(count, sig, span)
+  | {⊓(∘|⊐≡∘|◌)} °{⊙⊙∘} # Switch(count, sig, span)
 
   | °□⊢ # Format(parts, span)
 
@@ -718,15 +753,15 @@ PreProcessInstrArgs ← (|2
 
   | °□⊢ # TouchStack(count, span)
 
-  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PushTemp(stack, count, span)
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙◌ °{⊙⊙∘} # PushTemp(stack, count, span)
 
-  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # PopTemp(stack, count, span)
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙◌ °{⊙⊙∘} # PopTemp(stack, count, span)
 
-  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # CopyToTemp(stack, count, span)
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙◌ °{⊙⊙∘} # CopyToTemp(stack, count, span)
 
-  | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙; °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
+  | [⊙⊙∘] ⊗: {"Inline" "Under"}□ ⊙⊙⊙◌ °{⊙⊙⊙∘} # CopyFromTemp(stack, offset, count, span)
 
-  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙; °{⊙⊙∘} # DropTemp(stack, count, span)
+  | ⊟ ⊗: {"Inline" "Under"}□ ⊙⊙◌ °{⊙⊙∘} # DropTemp(stack, count, span)
 
   | ∘ # PushSig
 
@@ -742,7 +777,6 @@ AnalyzeInstr ← (
   type.
   (
     {InstrTypePush NullToNaN} # number literal
-
   | ⍤$"complex in JSON?"0
   | {InstrTypePush ∘} # string literal
 
@@ -778,8 +812,7 @@ ExecInstr ← (|2
     # push
     # -- value runtime
     RtPush □ # push onto stack
-
-  | # prim
+  |          # prim
     # -- primid runtime
     ExecPrimitive
   | # other
@@ -823,80 +856,133 @@ ReduceFrameArray ← °□⊡1°□⊢⇌
 # { frametype { counter array fnslice } } -- fnslice
 ReduceFrameFn ← °□⊡2°□⊢⇌
 
+# { frametype { counter array fnslice acc } } -- counter
+ScanFrameCounter ← ReduceFrameCounter
+
+# { frametype { counter array fnslice acc } } -- array
+ScanFrameArray ← ReduceFrameArray
+
+# { frametype { counter array fnslice acc } } -- fnslice
+ScanFrameFn ← ReduceFrameFn
+
+# { frametype { counter array fnslice acc } } -- acc
+ScanFrameAcc ← °□⊡3°□⊢⇌
+
+# { frametype { counter array fnslice acc } } -- bool
+ScanFrameDone ← ReduceFrameDone
+---
+⍤⊃⋅∘≍ 0 ScanFrameDone {FrameTypeScan {0 [123] [1 2] [10 20]}}
+⍤⊃⋅∘≍ 1 ScanFrameDone {FrameTypeScan {1 [123] [1 2] [10 20]}}
+---
+
+# runtime instrs -- runtime'
+AdvancePlainFrame ← (|2
+  ⍜(⊢RtCallStack)(|2.2
+    # -- topframe instrs
+    ⊃(
+      ⍜PlainFramePc (+1) # bump pc
+      PlainFrameDone.    # done?
+      (
+        # no: keep frame
+        | ⋅[] # yes: destroy frame
+
+      )
+    | PlainFrameGetInstr # fetch next instr
+
+    )
+  )
+  # -- runtime' instr
+  ExecInstr
+)
+
+# runtime -- runtime'
+AdvanceRepeatFrame ← (|1
+  ⍜(⊢RtCallStack)(|1.2
+    # -- topframe
+    ⊃(
+      ⍜RepeatFrameCounter (+1) # bump counter
+      RepeatFrameDone.         # done?
+      (
+        # no: keep frame
+        | ⋅[] # yes: destroy frame
+
+      )
+    | RepeatFrameFn
+    )
+  )
+  # -- runtime'  fnslice
+  ⊙MakePlainFrame # make frame from fn
+  # -- runtime newframe
+  ⍜RtCallStack(⊂ :) # push new frame onto callstack
+)
+
+# runtime -- runtime'
+AdvanceReduceFrame ← (|1
+  ⍜(⊢RtCallStack)(|1.3
+    # -- topframe
+    ⊃(
+      ⍜ReduceFrameCounter (+1) # bump counter
+      ReduceFrameDone.         # done?
+      (
+        # no: keep frame
+        | ⋅[] # yes: destroy frame
+
+      )
+    | ⊃(°□⊡⊃(ReduceFrameCounter|ReduceFrameArray)|ReduceFrameFn)
+    )
+    # -- topframe elt fnslice
+  )
+  # setup next call
+  # -- runtime' elt fnslice
+  RtPush □:
+  ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
+  # -- runtime' fnslice
+  ⊙MakePlainFrame # make frame from fn
+  # -- runtime newframe
+  ⍜RtCallStack (⊂:) # push new frame onto callstack
+)
+
+# runtime -- runtime'
+AdvanceScanFrame ← (|1
+  ⊃(⊢RtCallStack|°□⊢ RtStack|∘) # extract scanframe, peek at last result
+
+  # -- scanframe result runtime
+  ⍜ScanFrameAcc ⊂ # append result to accumulator
+
+  # -- scanframe runtime
+  ⍜ScanFrameCounter (+1) # bump counter
+  ScanFrameDone.         # done?
+  (
+    # no: setup next call, update callstack
+
+    # -- scanframe runtime
+    ⊃(°□⊡⊃(ScanFrameCounter|ScanFrameArray)|⋅∘|ScanFrameFn|∘)
+    # -- elt runtime fnslice scanframe
+    RtPush □
+    # -- runtime' fnslice scanframe
+    ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
+    # -- runtime' fnslice scanframe
+    ⊙(⊟ MakePlainFrame) # make frame from fn, join scanframe and newframe
+    # -- runtime newframes
+    ⍜(⊢RtCallStack) ⋅∘ # replace top of callstack
+  |                    # yes: destroy frame
+    # -- scanframe runtime
+    ⊙(◌RtPop 1)           # remove last result from stack
+    RtPush □ ScanFrameAcc # push accumulator from frame
+
+    ⍜RtCallStack (↘1) # remove scanframe from callstack
+  )
+)
+
 # runtime instrs -- runtime'
 Advance ← (|2
   # -- runtime instrs
   FrameType ⊢RtCallStack. # switch on top frame type
   (
-    # plain frame
-    ⍜(⊢RtCallStack)(|2.2
-      # -- topframe instrs
-      ⊃(
-        ⍜PlainFramePc (+1) # bump pc
-        PlainFrameDone.    # done?
-        (
-          # no: keep frame
-
-            | ⋅[] # yes: destroy frame
-
-        )
-        | PlainFrameGetInstr # fetch next instr
-
-      )
-    )
-    # -- runtime' instr
-    ExecInstr
-    # -- runtime
-
-  | # repeat frame
-
-    ⍜(⊢RtCallStack)(|1.2
-      # -- topframe
-      ⊃(
-        ⍜RepeatFrameCounter (+1) # bump counter
-        RepeatFrameDone.         # done?
-        (
-          # no: keep frame
-
-            | ⋅[] # yes: destroy frame
-
-        )
-        | RepeatFrameFn
-      )
-    )
-    # -- runtime'  fnslice
-    ⊙MakePlainFrame # make frame from fn
-    # -- runtime newframe
-    ⍜RtCallStack(⊂ :) # push new frame onto callstack
-    # -- runtime
-
-  | # reduce frame
-
-    ⍜(⊢RtCallStack)(|1.3
-      # -- topframe
-      ⊃(
-        ⍜ReduceFrameCounter (+1) # bump counter
-        ReduceFrameDone.         # done?
-        (
-          # no: keep frame
-
-            | ⋅[] # yes: destroy frame
-
-        )
-        | ⊃(°□⊡⊃(ReduceFrameCounter|ReduceFrameArray)|ReduceFrameFn)
-      )
-      # -- topframe elt fnslice
-
-    )
-    # -- runtime' elt fnslice
-    RtPush □:
-    ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
-    # -- runtime' fnslice
-    ⊙MakePlainFrame # make frame from fn
-    # -- runtime newframe
-    ⍜RtCallStack(⊂ :) # push new frame onto callstack
-    # -- runtime
-
+    AdvancePlainFrame
+  | AdvanceRepeatFrame
+  | AdvanceReduceFrame
+  | AdvanceScanFrame
   )
 )
 
@@ -907,20 +993,17 @@ Run ← (|1
     ▽ ≡(±⊢⇌).       # drop empty slices
     ≡MakePlainFrame # initial callstack from top_slices
     MakeRuntime     # initial runtime from callstack
-
   | ≡(AnalyzeInstr °□)°□get "instrs"
   )
   # -- runtime instrs
   ⍢(
     |2.2 Advance ⊙. # keep instrs
-
-  | ±⧻ RtCallStack # until callstack is empty
+  | ±⧻ RtCallStack  # until callstack is empty
 
   )
   # -- runtime instrs
-  ⊙;      # drop instrs
+  ⊙◌      # drop instrs
   RtStack # extract stack
-
 )
 
 StackColors ← +200×55⋯5_4_6_2_3_1
@@ -949,7 +1032,7 @@ IsImported
   (
     # run tests
     &p "Running tests…"
-    ;&runi {"uiua" "run" $"_-tests.ua" ↘ ¯3 GetProgramPath}
+    ◌&runi {"uiua" "run" "--no-format" $"_-tests.ua" ↘ ¯3 GetProgramPath}
   | Main
   )
 | # imported: do nothing

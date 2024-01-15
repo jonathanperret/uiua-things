@@ -3,7 +3,7 @@
 JsonParse ← &i "json.ua" "JsonParse"
 Run ← &i "vm.ua" "Run"
 
-MkTemp ← (⍤⊃(:¬⊙⋅∘|▽≠@\n.;) &runc "mktemp") # keep the parentheses!
+MkTemp ← (⍤⊃(:¬⊙⋅∘|▽≠@\n.◌) &runc "mktemp") # keep the parentheses!
 
 # contents -- …
 WithTempFile ← setund(
@@ -15,7 +15,7 @@ WithTempFile ← setund(
 
 CompileAndRun ← (
   ⊂"# Experimental!\n"
-  ⍜WithTempFile (⋅⊙; &runc {"uiua" "build" "-o" "/dev/stdout" ∘})
+  ⍜WithTempFile (⋅⊙◌ &runc {"uiua" "build" "-o" "/dev/stdout" ∘})
   JsonParse
   Run
 )

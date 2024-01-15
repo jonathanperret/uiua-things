@@ -1,6 +1,6 @@
 # Experimental!
 
-Log ← ;$" * _: _"
+Log ← ◌$" * _: _"
 
 StringRE ← "\"(?:[^\"\\\\]+|\\\\.)*\""
 NumberRE ← "[+-]?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?"
@@ -21,7 +21,6 @@ ParseString ← (
   ∊ @\\ . # check for easy string
   (
     ∘ # nothing to do
-
   | ♭ regex "[^\\\\]+|\\\\u[0-9a-fA-F]{4}|\\\\."
     ≡(
       =@\\⊢. # is it an escape?
@@ -41,17 +40,14 @@ ParseString ← (
       )
     )
     ⊐/⊂ # collect parts
-
   )
 )
 
 # ( idx tokens -- value idx tokens )
 Parse ← ↬(|2.3
   ⊃(
-    °□⊡ # pick next token
-
+    °□⊡    # pick next token
   | ⊓(+1)∘ # advance index
-
   )
   ⊗:"\"ntf{["⊢. # classify token
   (∘|-1)≥5.     # merge [ and {
@@ -76,30 +72,25 @@ Parse ← ↬(|2.3
         ¤□       # turn first value into array
         1        # -- continue? array-so-far idx tokens
         ⍢(
-          ; # drop continue-flag
+          ◌ # drop continue-flag
           # -- array-so-far idx tokens
-          ¬∊:"}]" ⊃(⊢⊡;|⊙⊙∘) # peek at next token
+          ¬∊:"}]" ⊃(⊢⊡◌|⊙⊙∘) # peek at next token
           (
             # closing brace: object/array done
-            ⊙(+1) # eat closing brace
-            0     # exit loop
-
+            ⊙(+1)      # eat closing brace
+            0          # exit loop
                 |      # not a closing brace: there's a value next
             ⊙(|2.3 □↫) # read value, box it
             ⊂          # append value
             1          # continue loop
-
           )
         )∘ # while continue-flag is 1
         # -- continue-flag array tokens'
-        ; # drop continue-flag
-
+        ◌ # drop continue-flag
       )
     )
     (∘|map°⊟⍉↯¯1_2)=@{⊢ # make map if object
-
-  | ⋕ # number
-
+  | ⋕                   # number
   )
 )
 
@@ -107,8 +98,7 @@ JsonParse ← (
   Log "Lex" ⍜now Lex
   Log "tokens" ⧻.
   Log "Parse" ⍜now Parse 0
-  ⊙⋅; # drop idx, tokens
-
+  ⊙⋅◌ # drop idx, tokens
 )
 
 ---
@@ -198,10 +188,10 @@ Lex
 Aeq {"[" "123" "456" "]"}
 
 $ 123
-Aeq 123 ⊙⋅; Parse 0 Lex
+Aeq 123 ⊙⋅◌ Parse 0 Lex
 
 $ "x"
-Aeq "x" ⊙⋅; Parse 0 Lex
+Aeq "x" ⊙⋅◌ Parse 0 Lex
 
 # &p "Tests OK."
 ---

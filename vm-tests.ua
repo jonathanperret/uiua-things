@@ -192,7 +192,7 @@ TestCases ← {
   $ /⊂ ↯[2 2 4]⇡16
   $ /+ [123]
   $ /+ 123
-  $ /× ↯3_0 0
+  $ /× ↯[3 0] 0
   # $ /+ []
   # $ /× []
   # $ /↥ []
@@ -209,10 +209,12 @@ TestCases ← {
   # $ ⇌∧(⊂+⊙(⊢.)) ⊃↘↙1 [1 2 3 4]
 
   # scan
-  # $ \+   [1 2 3 4]
-  # $ \-   [1 2 3 4]
-  # $ \(-:) [1 2 3 4]
-  # $ ▽\↧≠@ . "Hello World!"
+  $ \\+   []
+  $ \\+   [123]
+  $ \\+   [1 2 3 4]
+  $ \\-   [1 2 3 4]
+  $ \\(-:) [1 2 3 4]
+  $ ▽\\↧≠@ . "Hello World!"
   # $ ⊕□\+=@    . "Everyday man's on the block"
   # $ ⊕□\+↻¯1=@ . "Everyday man's on the block"
 
@@ -362,7 +364,6 @@ MakeCheckProgram ← (
   $ _
   $ }
   $ Check: _
-
 )
 
 # expr -- success
@@ -373,8 +374,7 @@ AutoCheck ← (|1
   # -- exitcode stdout stderr
   ⊃(
     ↧ ∩(=0) ⊙⋅⧻ # success is exitcode=0 && empty stderr
-
-  | ⋅⊂ # join stderr to stdout
+  | ⋅⊂          # join stderr to stdout
 
   )
   # -- success output expr
