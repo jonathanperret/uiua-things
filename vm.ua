@@ -378,7 +378,7 @@ Recur ← (|1
 )
 
 SpecialNames ← {
-  "identity" "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
+  "identity" "reduce" "fold" "scan" "each" "rows" "table" "repeat" "group" "partition" "unpack"
   "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
   "inv_dump" "inv_scan" "ungroup" "unpartition" "all"}
 SpecialFns ← (
@@ -389,7 +389,6 @@ SpecialFns ← (
 | ToDo "each"
 | ToDo "rows"
 | ToDo "table"
-| ToDo "cross"
 | Repeat
 | ToDo "group"
 | ToDo "partition"
