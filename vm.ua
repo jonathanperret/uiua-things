@@ -11,15 +11,25 @@ MapPairs ← ⍉⊟°map
 
 EmptyStack ← {}
 
-# runtime = { callstack stack tempstacks arraystack }
+# runtime = { callstack stack tempstacks arraystack thisstack }
+
+EmptySliceStack ← ↯0_2[]
 
 # callstack -- runtime
-MakeRuntime ← {⊃(∘|EmptyStack|{EmptyStack EmptyStack}|[])}
+MakeRuntime ← {
+  ⊃(
+    ∘
+  | EmptyStack
+  | {EmptyStack EmptyStack}
+  | []
+  | EmptySliceStack
+  )}
 
 RtCallStack ← °□⊢
 RtStack ← °□⊡1
 RtTempStacks ← °□⊡2
 RtArrayStack ← °□⊡3
+RtThisStack ← °□⊡4
 
 # count runtime -- runtime'
 RtTouchStack ← (|2
@@ -45,10 +55,11 @@ FrameTypePlain ← 0
 FrameTypeRepeat ← 1
 FrameTypeReduce ← 2
 FrameTypeScan ← 3
+FrameTypeThis ← 4
 
-# frame = { frametype ({ pc addrs } | { counter count fn } | { counter array fnslice }) }
+# frame = { frametype framedetails }
 
-# slice -- frame
+# slice -- { frametype { pc addrs } }
 MakePlainFrame ← (|1
   ExpandSlice
   0 # pc
@@ -56,7 +67,7 @@ MakePlainFrame ← (|1
   {FrameTypePlain ∘}
 )
 
-# count [fnsig fnslice] -- frame
+# count [fnsig fnslice] -- { frametype { counter count fn } }
 MakeRepeatFrame ← (|2
   ⊙FnSlice # keep only fnslice
   0        # counter
@@ -64,7 +75,7 @@ MakeRepeatFrame ← (|2
   {FrameTypeRepeat ∘}
 )
 
-# [fnsig fnslice] array -- frame
+# [fnsig fnslice] array -- { frametype { counter array fnslice } }
 MakeReduceFrame ← (|2
   {
     ⊃(
@@ -85,6 +96,11 @@ MakeScanFrame ← (
     | ⋅(↙1)
     )  }
   {FrameTypeScan ∘}
+)
+
+# -- frame
+MakeThisFrame ← (
+  {FrameTypeThis []}
 )
 
 FrameType ← °□⊡0
@@ -343,6 +359,24 @@ Scan ← (|1
   )
 )
 
+# runtime -- runtime'
+This ← (|1
+  FnSlice °{∘} RtPop 1
+  # -- fnslice runtime
+  ⊃(∘|⍜⊙RtThisStack ⊂)
+  # -- fnslice runtime'
+  ⊙(⍜RtCallStack (⊂ MakeThisFrame))
+  ⍜⊙RtCallStack (⊂ MakePlainFrame) # push new frame onto callstack
+)
+
+# runtime -- runtime'
+Recur ← (|1
+  ⊃(⊢RtThisStack|∘)
+  # -- fnslice runtime
+  MakePlainFrame
+  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
+)
+
 SpecialNames ← {
   "identity" "reduce" "fold" "scan" "each" "rows" "table" "cross" "repeat" "group" "partition" "unpack"
   "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
@@ -363,8 +397,8 @@ SpecialFns ← (
 | ToDo "do"
 | ToDo "fill"
 | ToDo "try"
-| ToDo "this"
-| ToDo "recur"
+| This
+| Recur
 | ToDo "bind"
 | ToDo "memo"
 | ToDo "spawn"
@@ -468,7 +502,7 @@ EndArray ← (|2
 
 # [] runtime -- runtime'
 Call ← (|2
-  MakePlainFrame ⊡1°{∘} RtPop 1 ◌
+  MakePlainFrame FnSlice°{∘} RtPop 1 ◌
   ⍜⊙RtCallStack ⊂ # push new frame onto callstack
 )
 
@@ -935,6 +969,12 @@ AdvanceScanFrame ← (|1
   )
 )
 
+# runtime -- runtime'
+AdvanceThisFrame ← (|1
+  ⍜RtThisStack (↘1) # remove this context
+  ⍜RtCallStack (↘1) # remove thisframe from callstack
+)
+
 # runtime instrs -- runtime'
 Advance ← (|2
   # -- runtime instrs
@@ -944,6 +984,7 @@ Advance ← (|2
   | AdvanceRepeatFrame
   | AdvanceReduceFrame
   | AdvanceScanFrame
+  | AdvanceThisFrame
   )
 )
 
