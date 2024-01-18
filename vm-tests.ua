@@ -155,6 +155,8 @@ TestCases ← {
   $ [insert 5 6] map [1 2] [3 4]
   $ [.] 1
   $ [$"hello \_"] 123
+  # BindGlobal
+  $ X ← 5 § [ X *2 X ]
   # inv_where
   $ °⊚[0 3 5 6]
   # inverse_bits
@@ -279,6 +281,9 @@ TestCases ← {
   # $ bind(⊂ b + a c) 1 2 3
   # memo
   # $ ∵memo(+⌊×10⚂)[1 1 2 2 3 3]
+  $ F ← memo(+⌊×100⚂) § - F 1 F 1
+  $ F ← memo(rand⚂) § - [F 1] [F 1]
+  $ F ← memo(rand⚂+) § - [F 1 2] [F 1 2]
   # spawn
   # wait
   # $ wait spawn⇡ 10

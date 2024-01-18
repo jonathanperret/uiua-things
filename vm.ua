@@ -5,7 +5,7 @@ Log ← &p
 # map -- pairs
 MapPairs ← ⍉⊟°map
 EmptyStack ← {}
-# runtime = { callstack stack tempstacks arraystack thisstack }
+# runtime = { callstack stack tempstacks arraystack thisstack globals memo }
 EmptySliceStack ← ↯0_2[]
 # callstack -- runtime
 MakeRuntime ← {
@@ -15,12 +15,16 @@ MakeRuntime ← {
   | {EmptyStack EmptyStack}
   | []
   | EmptySliceStack
+  | {}
+  | map {} {}
   )}
 RtCallStack ← °□⊢
 RtStack ← °□⊡1
 RtTempStacks ← °□⊡2
 RtArrayStack ← °□⊡3
 RtThisStack ← °□⊡4
+RtGlobals ← °□⊡5
+RtMemo ← °□⊡6
 # count runtime -- runtime'
 RtTouchStack ← (|2
   - ⊙(⧻RtStack.) # compute stacklength if count values were popped
@@ -35,13 +39,17 @@ RtPop ← (
 )
 # value(s) runtime -- runtime'
 RtPush ← ⍜⊙RtStack ⊂
-FnSig ← ⊢
-FnSlice ← ⊢⇌
+FnId ← °□⊢
+FnSig ← °□⊡1
+SigInputs ← ⊢
+SigOutputs ← ⊢⇌
+FnSlice ← °□⊡2
 FrameTypePlain ← 0
 FrameTypeRepeat ← 1
 FrameTypeReduce ← 2
 FrameTypeScan ← 3
 FrameTypeThis ← 4
+FrameTypeMemo ← 5
 # frame = { frametype framedetails }
 # slice -- { frametype { pc addrs } }
 MakePlainFrame ← (|1
@@ -50,14 +58,14 @@ MakePlainFrame ← (|1
   {⊙∘}
   {FrameTypePlain ∘}
 )
-# count [fnsig fnslice] -- { frametype { counter count fn } }
+# count fn -- { frametype { counter count fnslice } }
 MakeRepeatFrame ← (|2
   ⊙FnSlice # keep only fnslice
   0        # counter
   {⊙⊙∘}
   {FrameTypeRepeat ∘}
 )
-# [fnsig fnslice] array -- { frametype { counter array fnslice } }
+# fn array -- { frametype { counter array fnslice } }
 MakeReduceFrame ← (|2
   {
     ⊃(
@@ -81,6 +89,10 @@ MakeScanFrame ← (
 # -- frame
 MakeThisFrame ← (
   {FrameTypeThis []}
+)
+# key outputcount -- frame
+MakeMemoFrame ← (|2
+  {FrameTypeMemo {⊙∘}}
 )
 FrameType ← °□⊡0
 ToDo ← ⍤⊙0 $"_ is not implemented"
@@ -305,7 +317,7 @@ Scan ← (|1
     ⊃(
       # initialize scan frame: accumulator = 1-prefix of array
       MakeScanFrame
-    | # set up first call with first and second elements
+    |   # set up first call with first and second elements
       ◌ # drop fn
       RtPush ≡□ ↙2
     | FnSlice
@@ -332,6 +344,28 @@ Recur ← (|1
   MakePlainFrame
   ⍜⊙RtCallStack ⊂ # push new frame onto callstack
 )
+# runtime -- runtime'
+Memo ← (|1
+  °{∘} RtPop 1
+  # -- fn runtime
+  ⊃(∘|RtPop SigInputs FnSig|⋅∘)
+  # -- fn args runtime1 runtime0
+  ⊃({⊙∘} FnId ⊙⊙⊙∘|∘)
+  # -- key runtime1 runtime0 fn
+  ⊙(RtMemo.)
+  # -- key memo runtime1 runtime0 fn
+  has,,
+  (
+    # not found: setup memoframe and call fn
+    ⊃(⋅⋅⋅∘|MakePlainFrame ⋅⋅⋅⋅FnSlice|MakeMemoFrame ⊙⋅⋅⋅(SigOutputs FnSig))
+    # -- runtime0 fnframe memoframe
+    ⍜RtCallStack (⊂: ⊙⊟)
+  | # found: return values
+    ⊃(°□get|⋅⋅∘)
+    # -- values runtime1
+    RtPush
+  )
+)
 SpecialNames ← {
   "identity" "reduce" "fold" "scan" "each" "rows" "table" "repeat" "group" "partition" "unpack"
   "do" "fill" "try" "this" "recur" "bind" "memo" "spawn" "wait" "send" "recv" "tryrecv" "dump"
@@ -354,7 +388,7 @@ SpecialFns ← (
 | This
 | Recur
 | ToDo "bind"
-| ToDo "memo"
+| Memo
 | ToDo "spawn"
 | ToDo "wait"
 | ToDo "send"
@@ -402,9 +436,33 @@ ExecPrimitive ← (
 # {ident} runtime -- runtime'
 Comment ← ∘ToDo "Comment"
 # {index call sig} runtime -- runtime'
-CallGlobal ← ∘ToDo "CallGlobal"
-# {span index} runtime -- runtime'
-BindGlobal ← ∘ToDo "BindGlobal"
+CallGlobal ← (|2
+  °{⊙⊙∘}
+  # -- index call sig runtime
+  ⊙⋅◌
+  # -- index runtime
+  ⊙(RtGlobals.)
+  # -- index globals runtime
+  ⊡
+  # -- value runtime
+  RtPush
+)
+# index runtime -- runtime'
+BindGlobal ← (|2
+  :⊙(°{∘} RtPop1)
+  # -- value index runtime
+  ⍜⊙⊙RtGlobals (
+    # -- value index globals
+    # grow globals array
+    ⊙(
+      # -- index globals
+      (⊙∘|⊃∘(⬚(□0)↯[+1])) ≤⊙⧻,,
+      # -- index globals'
+    )
+    # -- value index globals
+    ⍜⊙⊡(□⊙◌) # set global entry
+  )
+)
 # [] runtime -- runtime'
 BeginArray ← (|2
   ◌ # drop dummy arg
@@ -448,7 +506,7 @@ Call ← (|2
   MakePlainFrame FnSlice°{∘} RtPop 1 ◌
   ⍜⊙RtCallStack ⊂ # push new frame onto callstack
 )
-# [ sig slice ] runtime -- runtime'
+# fn runtime -- runtime'
 PushFunc ← RtPush □
 # {fncount sig} runtime -- runtime'
 Switch ← (|2
@@ -462,8 +520,8 @@ Switch ← (|2
   # -- fnslice fnsig sig runtime
   ⊓(
     MakePlainFrame
-  |                 # compute args to discard
-    ⊃(⋅⊢|⋅⋅∘|/-⇌ -) # -- sig.args runtime discardcount=((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
+  |                       # compute args to discard
+    ⊃(SigInputs⋅⊙∘|/-⇌ -) # -- sig.args runtime discardcount=((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
     ⍜⊙RtStack (
       # -- takecount stack discardcount
       ⍜↙(↘ ¯:) # discard extra args
@@ -658,13 +716,13 @@ DeserializeArray ← ↬(
 # instrid jsoninstrargs -- instrargs
 PreProcessInstrArgs ← (|2
   (
-    ⋅[] # Comment(ident)
-  | ∘   # CallGlobal
-  | ∘ # BindGlobal
+    ⋅[]         # Comment(ident)
+  | {⊙⊙∘}°{⊙⊙∘} # CallGlobal(index, call, sig)
+  | ◌°{⊙∘} # BindGlobal(span, index)
   | ⋅[] # BeginArray
   | °□⊢ # EndArray(boxed, span)
   | ⋅[] # Call(span)
-  | [⊓(◌|⊐≡∘|⊐≡∘)] °{⊙⊙∘} # PushFunc(id, slice, sig)
+  | {⊓(∘|⊐≡∘|⊐≡∘)} °{⊙⊙∘} # PushFunc(id, slice, sig)
   | {⊓(∘|⊐≡∘|◌)} °{⊙⊙∘} # Switch(count, sig, span)
   | °□⊢ # Format(parts, span)
   | ∘ # Dynamic
@@ -827,6 +885,10 @@ ScanFrameFn ← ReduceFrameFn
 ScanFrameAcc ← °□⊡3°□⊢⇌
 # { frametype { counter array fnslice acc } } -- bool
 ScanFrameDone ← ReduceFrameDone
+# { frametype { key outputcount } } -- key
+MemoFrameKey ← °□⊢°□⊡1
+# { frametype { key outputcount } } -- outputcount
+MemoFrameOutputCount ← °□⊢⇌°□⊡1
 ---
 ⍤⊃⋅∘≍ 0 ScanFrameDone {FrameTypeScan {0 [123] [1 2] [10 20]}}
 ⍤⊃⋅∘≍ 1 ScanFrameDone {FrameTypeScan {1 [123] [1 2] [10 20]}}
@@ -855,13 +917,26 @@ AdvanceScanFrame ← (|1
     # -- scanframe runtime
     ⊙(◌RtPop 1)           # remove last result from stack
     RtPush □ ScanFrameAcc # push accumulator from frame
-    ⍜RtCallStack (↘1) # remove scanframe from callstack
+    ⍜RtCallStack (↘1)     # remove scanframe from callstack
   )
 )
 # runtime -- runtime'
 AdvanceThisFrame ← (|1
   ⍜RtThisStack (↘1) # remove this context
   ⍜RtCallStack (↘1) # remove thisframe from callstack
+)
+# runtime -- runtime'
+AdvanceMemoFrame ← (|1
+  ⍜RtCallStack ⊃(↘1|°□⊢) # remove memoframe from callstack
+  # -- runtime' memoframe
+  # get outputcount
+  ⊙⊃(MemoFrameOutputCount|MemoFrameKey)
+  # -- runtime outputcount key
+  # copy outputs from stack
+  ⊃(⋅⋅∘|↙:RtStack|∘)
+  # -- runtime key outputs
+  # store outputs under key
+  ⍜⊙⊙RtMemo (insert ∩□)
 )
 # runtime instrs -- runtime'
 Advance ← (|2
@@ -873,6 +948,7 @@ Advance ← (|2
   | AdvanceReduceFrame
   | AdvanceScanFrame
   | AdvanceThisFrame
+  | AdvanceMemoFrame
   )
 )
 # jsonasm -- finalstack
