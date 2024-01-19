@@ -31,14 +31,17 @@ RtTouchStack ← (|2
   # -- newlength runtime
   ⍜⊙RtArrayStack ↧ # lower arraystack entries if above newlength
 )
+# value(s) runtime -- runtime'
+RtPush ← ⍜⊙RtStack (⊂:)
 # count runtime -- values runtime'
 RtPop ← (
   ⊃(∘|RtTouchStack)
   # -- count runtime'
-  ⍜⊙RtStack ⊃↙↘
+  ⍜⊙RtStack ⊃↙↘¯
+  ⇌
 )
-# value(s) runtime -- runtime'
-RtPush ← ⍜⊙RtStack ⊂
+# runtime -- topvalue
+RtPeek ← °□⊢⇌RtStack
 FnId ← °□⊢
 FnSig ← °□⊡1
 SigInputs ← ⊢
@@ -319,7 +322,7 @@ Scan ← (|1
       MakeScanFrame
     |   # set up first call with first and second elements
       ◌ # drop fn
-      RtPush ≡□ ↙2
+      RtPush ⇌ ≡□ ↙2
     | FnSlice
     )
     # -- newframe runtime' fnslice
@@ -363,7 +366,7 @@ Memo ← (|1
   | # found: return values
     ⊃(°□get|⋅⋅∘)
     # -- values runtime1
-    RtPush
+    RtPush ⇌
   )
 )
 SpecialNames ← {
@@ -424,11 +427,11 @@ ExecPrimitive ← (
   | RtPush □ NoadicOneOutputFns
   | MonadicNoOutputFns ⊙(°{∘}RtPop 1)
   | RtPush □ MonadicOneOutputFns ⊙(°{∘}RtPop 1)
-  | RtPush {⊙∘} MonadicTwoOutputFns ⊙(°{∘}RtPop 1)
+  | RtPush ⇌ {⊙∘} MonadicTwoOutputFns ⊙(°{∘}RtPop 1)
   | DyadicNoOutputFns ⊙(°{⊙∘}RtPop 2)
   | RtPush □ DyadicOneOutputFns ⊙(°{⊙∘}RtPop 2)
-  | RtPush {⊙∘} DyadicTwoOutputFns ⊙(°{⊙∘}RtPop 2)
-  | RtPush {⊙⊙∘} DyadicThreeOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush ⇌ {⊙∘} DyadicTwoOutputFns ⊙(°{⊙∘}RtPop 2)
+  | RtPush ⇌ {⊙⊙∘} DyadicThreeOutputFns ⊙(°{⊙∘}RtPop 2)
   | RtPush □ TriadicOneOutputFns ⊙(°{⊙⊙∘}RtPop 3)
   | SpecialFns
   )
@@ -480,10 +483,10 @@ EndArray ← (|2
   ⊙(
     # -- runtime
     ⍜RtArrayStack (
-      ⊃(↘1|¯°□⊢)
+      ⊃(↘1|°□⊢)
     )
-    # -- runtime -startlevel
-    ⍜RtStack(⊃↙↘ :) # take and drop from bottom of stack
+    # -- runtime startlevel
+    ⍜RtStack(⊃↙(⇌↘) :) # take and drop from bottom of stack
   )
   # -- boxed runtime' values
   (
@@ -524,7 +527,7 @@ Switch ← (|2
     ⊃(SigInputs⋅⊙∘|/-⇌ -) # -- sig.args runtime discardcount=((sig.args - f.sig.args) - (sig.outputs - f.sig.outputs))
     ⍜⊙RtStack (
       # -- takecount stack discardcount
-      ⍜↙(↘ ¯:) # discard extra args
+      ⍜↙(↘ :) ¯ # discard extra args
     )
     # --runtime
   )
@@ -578,14 +581,14 @@ PopTemp ← (|2
   # -- count stackid runtime
   ⍜(⊙(°□⊡) ⊙⊙RtTempStacks) ⊃↙↘
   # -- runtime values
-  RtPush ⇌ # push to stack
+  RtPush # push to stack
 )
 # [stackid count] runtime -- runtime'
 CopyToTemp ← (|2
   °⊟
   # -- stackid count runtime
   # copy from stack
-  ⊃⋅(↙ ⊙RtStack) ⊙⋅∘
+  ⊃⋅(↙¯ ⊙RtStack) ⊙⋅∘
   # -- values stackid runtime
   ⍜⊙⊙RtTempStacks ⍜⊙(°□⊡) (⊂⇌)
 )
@@ -597,7 +600,7 @@ CopyFromTemp ← (|2
   # -- count offset tempstack runtime
   ↙ ⊙↘
   # -- values runtime
-  RtPush⇌ # push to stack
+  RtPush # push to stack
 )
 # [stackid count] runtime -- runtime'
 DropTemp ← (|2
@@ -869,7 +872,7 @@ AdvanceReduceFrame ← (|1
   # setup next call
   # -- runtime' elt fnslice
   RtPush □:
-  ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
+  ⍜RtStack ⍜(↙¯2)⇌ # flip elt under acc
   # -- runtime' fnslice
   ⊙MakePlainFrame # make frame from fn
   # -- runtime newframe
@@ -895,7 +898,7 @@ MemoFrameOutputCount ← °□⊢⇌°□⊡1
 ---
 # runtime -- runtime'
 AdvanceScanFrame ← (|1
-  ⊃(⊢RtCallStack|°□⊢ RtStack|∘) # extract scanframe, peek at last result
+  ⊃(⊢RtCallStack|RtPeek|∘) # extract scanframe, peek at last result
   # -- scanframe result runtime
   ⍜ScanFrameAcc ⊂ # append result to accumulator
   # -- scanframe runtime
@@ -908,7 +911,7 @@ AdvanceScanFrame ← (|1
     # -- elt runtime fnslice scanframe
     RtPush □
     # -- runtime' fnslice scanframe
-    ⍜RtStack ⍜(↙2)⇌ # flip elt under acc
+    ⍜RtStack ⍜(↙¯2)⇌ # flip elt under acc
     # -- runtime' fnslice scanframe
     ⊙(⊟ MakePlainFrame) # make frame from fn, join scanframe and newframe
     # -- runtime newframes
@@ -933,7 +936,7 @@ AdvanceMemoFrame ← (|1
   ⊙⊃(MemoFrameOutputCount|MemoFrameKey)
   # -- runtime outputcount key
   # copy outputs from stack
-  ⊃(⋅⋅∘|↙:RtStack|∘)
+  ⊃(⋅⋅∘|⇌↙¯:RtStack|∘)
   # -- runtime key outputs
   # store outputs under key
   ⍜⊙⊙RtMemo (insert ∩□)
@@ -966,8 +969,8 @@ Run ← (|1
   | ±⧻ RtCallStack  # until callstack is empty
   )
   # -- runtime instrs
-  ⊙◌      # drop instrs
-  RtStack # extract stack
+  ⊙◌       # drop instrs
+  ⇌RtStack # extract stack
 )
 StackColors ← +200×55⋯5_4_6_2_3_1
 DumpColoredStack ← (
