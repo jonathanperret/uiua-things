@@ -573,15 +573,15 @@ PushTemp ← (|2
   # -- stackid count runtime
   ⊙(:RtPop)
   # -- stackid runtime values
-  ⍜(°□⊡⊙RtTempStacks) (⊂⇌:)
+  ⍜(°□⊡⊙RtTempStacks) ⊂
 )
 # [stackid count] runtime -- runtime'
 PopTemp ← (|2
   : °⊟
   # -- count stackid runtime
-  ⍜(⊙(°□⊡) ⊙⊙RtTempStacks) ⊃↙↘
+  ⍜(⊙⊙RtTempStacks) ⍜⊙(°□⊡) ⊃↙↘ ¯
   # -- runtime values
-  RtPush # push to stack
+  RtPush ⇌ # push to stack
 )
 # [stackid count] runtime -- runtime'
 CopyToTemp ← (|2
@@ -590,7 +590,7 @@ CopyToTemp ← (|2
   # copy from stack
   ⊃⋅(↙¯ ⊙RtStack) ⊙⋅∘
   # -- values stackid runtime
-  ⍜⊙⊙RtTempStacks ⍜⊙(°□⊡) (⊂⇌)
+  ⍜(⊙⊙RtTempStacks) ⍜⊙(°□⊡) (⊂:)
 )
 # [stackid offset count] runtime -- runtime'
 CopyFromTemp ← (|2
@@ -598,15 +598,15 @@ CopyFromTemp ← (|2
   # -- stackid offset count runtime
   ⊃(⋅:|°□⊡ ⊙(RtTempStacks ⋅⋅∘)|⋅⋅⋅∘)
   # -- count offset tempstack runtime
-  ↙ ⊙↘
+  ↙ ⊙↘ ∩¯
   # -- values runtime
-  RtPush # push to stack
+  RtPush ⇌ # push to stack
 )
 # [stackid count] runtime -- runtime'
 DropTemp ← (|2
   :°⊟
   # -- count stackid runtime
-  ⍜⊙⊙RtTempStacks ⍜⊙(°□⊡) ↘
+  ⍜(⊙⊙RtTempStacks) ⍜⊙(°□⊡) ↘ ¯
 )
 # {sig} runtime -- runtime'
 PushSig ← ∘ToDo "PushSig"
