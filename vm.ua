@@ -758,7 +758,7 @@ AnalyzeInstr ← (
     | ⍤$"complex in JSON?"0
     | #  [ "prim", span ]
       {InstrTypePrim ∘} get: PrimNamesToIds ⊢
-    | =3⍣(type°□⊢°□⊢)⋅⋅0. # detect [ { "transpose_n": n } ]
+    | =3⍣(type°□⊢⊢)⋅⋅0. # detect [ { "transpose_n": n } ]
       (
         # regular instr: { "Instr": [ args… ] }
         °[{⊙∘}] MapPairs
