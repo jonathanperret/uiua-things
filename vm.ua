@@ -25,6 +25,12 @@ RtArrayStack ← °□⊡3
 RtThisStack ← °□⊡4
 RtGlobals ← °□⊡5
 RtMemo ← °□⊡6
+# frame runtime -- runtime'
+RtEnter ← ⍜⊙RtCallStack (⊂:)
+# runtime -- runtime'
+RtLeave ← ⍜RtCallStack (↘¯1)
+# runtime -- frame
+RtTopFrame ← ⊢⇌RtCallStack
 # count runtime -- runtime'
 RtTouchStack ← (|2
   - ⊙(⧻RtStack.) # compute stacklength if count values were popped
@@ -269,7 +275,7 @@ Repeat ← (|1
     # special case 0 count: do nothing (return runtime)
     ⋅∘
   | # -- newframe runtime
-    ⍜⊙RtCallStack ⊂
+    RtEnter
   )
 )
 # runtime -- runtime'
@@ -294,7 +300,7 @@ Reduce ← (|1
   | # more than 1
     ⊃(MakeReduceFrame|RtPush □ ⋅⊢)
     # -- newframe runtime'
-    ⍜⊙RtCallStack ⊂
+    RtEnter
   )
 )
 # runtime -- runtime'
@@ -325,10 +331,10 @@ Scan ← (|1
       RtPush ⇌ ≡□ ↙2
     | FnSlice
     )
-    # -- newframe runtime' fnslice
-    :⍜⊙RtCallStack ⊂
-    # -- fnslice runtime'
-    ⍜⊙RtCallStack ⊂ MakePlainFrame
+    # -- scanframe runtime' fnslice
+    RtEnter
+    # -- runtime' fnslice
+    RtEnter MakePlainFrame:
   )
 )
 # runtime -- runtime'
@@ -337,15 +343,15 @@ This ← (|1
   # -- fnslice runtime
   ⊃(∘|⍜⊙RtThisStack ⊂)
   # -- fnslice runtime'
-  ⊙(⍜RtCallStack (⊂ MakeThisFrame))
-  ⍜⊙RtCallStack (⊂ MakePlainFrame) # push new frame onto callstack
+  ⊙(RtEnter MakeThisFrame)
+  RtEnter MakePlainFrame # push new frame onto callstack
 )
 # runtime -- runtime'
 Recur ← (|1
   ⊃(⊢RtThisStack|∘)
   # -- fnslice runtime
   MakePlainFrame
-  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
+  RtEnter # push new frame onto callstack
 )
 # runtime -- runtime'
 Memo ← (|1
@@ -360,9 +366,10 @@ Memo ← (|1
   has,,
   (
     # not found: setup memoframe and call fn
-    ⊃(⋅⋅⋅∘|MakePlainFrame ⋅⋅⋅⋅FnSlice|MakeMemoFrame ⊙⋅⋅⋅(SigOutputs FnSig))
-    # -- runtime0 fnframe memoframe
-    ⍜RtCallStack (⊂: ⊙⊟)
+    ⊃(MakePlainFrame ⋅⋅⋅⋅FnSlice|MakeMemoFrame ⊙⋅⋅⋅(SigOutputs FnSig)|⋅⋅⋅∘)
+    # -- fnframe memoframe runtime0
+    ⊙(RtEnter)
+    RtEnter
   | # found: return values
     ⊃(°□get|⋅⋅∘)
     # -- values runtime1
@@ -507,7 +514,7 @@ EndArray ← (|2
 # [] runtime -- runtime'
 Call ← (|2
   MakePlainFrame FnSlice°{∘} RtPop 1 ◌
-  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
+  RtEnter # push new frame onto callstack
 )
 # fn runtime -- runtime'
 PushFunc ← RtPush □
@@ -532,7 +539,7 @@ Switch ← (|2
     # --runtime
   )
   # -- newframe runtime
-  ⍜⊙RtCallStack ⊂ # push new frame onto callstack
+  RtEnter # push new frame onto callstack
 )
 # parts runtime -- runtime'
 Format ← (|2
@@ -802,7 +809,7 @@ PlainFrameGetInstr ← °□⊡⊡ °{⊙∘} °□⊢⇌
 PlainFramePc ← °□⊢°□⊢⇌
 # runtime instrs -- runtime'
 AdvancePlainFrame ← (|2
-  ⍜(⊢RtCallStack)(|2.2
+  ⍜(RtTopFrame)(|2.2
     # -- topframe instrs
     ⊃(
       ⍜PlainFramePc (+1) # bump pc
@@ -825,7 +832,7 @@ RepeatFrameDone ← /≤ ↙2 °□⊢⇌
 RepeatFrameFn ← °□⊡2 °□⊢⇌
 # runtime -- runtime'
 AdvanceRepeatFrame ← (|1
-  ⍜(⊢RtCallStack)(|1.2
+  ⍜(RtTopFrame)(|1.2
     # -- topframe
     ⊃(
       ⍜RepeatFrameCounter (+1) # bump counter
@@ -838,9 +845,9 @@ AdvanceRepeatFrame ← (|1
     )
   )
   # -- runtime'  fnslice
-  ⊙MakePlainFrame # make frame from fn
-  # -- runtime newframe
-  ⍜RtCallStack(⊂ :) # push new frame onto callstack
+  MakePlainFrame : # make frame from fn
+  # -- newframe runtime
+  RtEnter # push new frame onto callstack
 )
 # { frametype { counter array fnslice } } -- counter
 ReduceFrameCounter ← °□⊢°□⊢⇌
@@ -856,7 +863,7 @@ ReduceFrameArray ← °□⊡1°□⊢⇌
 ReduceFrameFn ← °□⊡2°□⊢⇌
 # runtime -- runtime'
 AdvanceReduceFrame ← (|1
-  ⍜(⊢RtCallStack)(|1.3
+  ⍜(RtTopFrame)(|1.3
     # -- topframe
     ⊃(
       ⍜ReduceFrameCounter (+1) # bump counter
@@ -874,9 +881,9 @@ AdvanceReduceFrame ← (|1
   RtPush □:
   ⍜RtStack ⍜(↙¯2)⇌ # flip elt under acc
   # -- runtime' fnslice
-  ⊙MakePlainFrame # make frame from fn
-  # -- runtime newframe
-  ⍜RtCallStack (⊂:) # push new frame onto callstack
+  MakePlainFrame : # make frame from fn
+  # -- newframe runtime
+  RtEnter # push new frame onto callstack
 )
 # { frametype { counter array fnslice acc } } -- counter
 ScanFrameCounter ← ReduceFrameCounter
@@ -898,7 +905,7 @@ MemoFrameOutputCount ← °□⊢⇌°□⊡1
 ---
 # runtime -- runtime'
 AdvanceScanFrame ← (|1
-  ⊃(⊢RtCallStack|RtPeek|∘) # extract scanframe, peek at last result
+  ⊃(RtTopFrame|RtPeek|∘) # extract scanframe, peek at last result
   # -- scanframe result runtime
   ⍜ScanFrameAcc ⊂ # append result to accumulator
   # -- scanframe runtime
@@ -913,24 +920,26 @@ AdvanceScanFrame ← (|1
     # -- runtime' fnslice scanframe
     ⍜RtStack ⍜(↙¯2)⇌ # flip elt under acc
     # -- runtime' fnslice scanframe
-    ⊙(⊟ MakePlainFrame) # make frame from fn, join scanframe and newframe
-    # -- runtime newframes
-    ⍜(⊢RtCallStack) ⋅∘ # replace top of callstack
-  |                    # yes: destroy frame
+    ⊙:
+    # -- runtime' scanframe fnslice
+    ⍜(RtTopFrame) ⋅∘ # update scanframe on stack
+    # -- runtime' fnslice
+    RtEnter MakePlainFrame: # call fn
+  |                         # yes: destroy frame
     # -- scanframe runtime
     ⊙(◌RtPop 1)           # remove last result from stack
     RtPush □ ScanFrameAcc # push accumulator from frame
-    ⍜RtCallStack (↘1)     # remove scanframe from callstack
+    RtLeave               # remove scanframe from callstack
   )
 )
 # runtime -- runtime'
 AdvanceThisFrame ← (|1
   ⍜RtThisStack (↘1) # remove this context
-  ⍜RtCallStack (↘1) # remove thisframe from callstack
+  RtLeave           # remove thisframe from callstack
 )
 # runtime -- runtime'
 AdvanceMemoFrame ← (|1
-  ⍜RtCallStack ⊃(↘1|°□⊢) # remove memoframe from callstack
+  ⊃(RtLeave|RtTopFrame) # remove memoframe from callstack
   # -- runtime' memoframe
   # get outputcount
   ⊙⊃(MemoFrameOutputCount|MemoFrameKey)
@@ -944,7 +953,7 @@ AdvanceMemoFrame ← (|1
 # runtime instrs -- runtime'
 Advance ← (|2
   # -- runtime instrs
-  FrameType ⊢RtCallStack. # switch on top frame type
+  FrameType RtTopFrame. # switch on top frame type
   (
     AdvancePlainFrame
   | AdvanceRepeatFrame
@@ -958,9 +967,9 @@ Advance ← (|2
 Run ← (|1
   ⊃(
     ⊐≡≡∘°□get "top_slices"
-    ▽ ≡(±⊢⇌).       # drop empty slices
-    ≡MakePlainFrame # initial callstack from top_slices
-    MakeRuntime     # initial runtime from callstack
+    ▽ ≡(±⊢⇌).        # drop empty slices
+    ⇌≡MakePlainFrame # initial callstack from top_slices
+    MakeRuntime      # initial runtime from callstack
   | ≡(AnalyzeInstr °□)°□get "instrs"
   )
   # -- runtime instrs
