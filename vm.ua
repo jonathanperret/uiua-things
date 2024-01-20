@@ -344,14 +344,14 @@ This ← (|1
   ⊃(∘|⍜⊙RtThisStack ⊂)
   # -- fnslice runtime'
   ⊙(RtEnter MakeThisFrame)
-  RtEnter MakePlainFrame # push new frame onto callstack
+  RtEnter MakePlainFrame
 )
 # runtime -- runtime'
 Recur ← (|1
   ⊃(⊢RtThisStack|∘)
   # -- fnslice runtime
   MakePlainFrame
-  RtEnter # push new frame onto callstack
+  RtEnter
 )
 # runtime -- runtime'
 Memo ← (|1
@@ -514,7 +514,7 @@ EndArray ← (|2
 # [] runtime -- runtime'
 Call ← (|2
   MakePlainFrame FnSlice°{∘} RtPop 1 ◌
-  RtEnter # push new frame onto callstack
+  RtEnter
 )
 # fn runtime -- runtime'
 PushFunc ← RtPush □
@@ -539,7 +539,7 @@ Switch ← (|2
     # --runtime
   )
   # -- newframe runtime
-  RtEnter # push new frame onto callstack
+  RtEnter
 )
 # parts runtime -- runtime'
 Format ← (|2
@@ -847,7 +847,7 @@ AdvanceRepeatFrame ← (|1
   # -- runtime'  fnslice
   MakePlainFrame : # make frame from fn
   # -- newframe runtime
-  RtEnter # push new frame onto callstack
+  RtEnter
 )
 # { frametype { counter array fnslice } } -- counter
 ReduceFrameCounter ← °□⊢°□⊢⇌
@@ -883,7 +883,7 @@ AdvanceReduceFrame ← (|1
   # -- runtime' fnslice
   MakePlainFrame : # make frame from fn
   # -- newframe runtime
-  RtEnter # push new frame onto callstack
+  RtEnter
 )
 # { frametype { counter array fnslice acc } } -- counter
 ScanFrameCounter ← ReduceFrameCounter
